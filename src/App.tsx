@@ -7,27 +7,17 @@ import { useNotificationSync } from './push/useNotificationSync'
 import { useSyncRunner } from './sync/useSyncRunner'
 import { syncConfigured, useSession } from './sync/supabase'
 import { LoginScreen } from './sync/LoginForm'
-import { useGoogleAutoSync } from './google/google'
-import { CalendarPage } from './pages/Calendar'
 import { ChatPage } from './pages/Chat'
-import { ImportSchedulePage } from './pages/ImportSchedule'
-import { FoodPage } from './pages/Food'
-import { Home } from './pages/Home'
-import { RemindersPage } from './pages/Reminders'
+import { MenuPage, NutritionPage, PantryPage, RecipesPage, ShoppingPage } from './pages/Pages'
 import { ScanFoodPage } from './pages/ScanFood'
-import { SchedulePage } from './pages/Schedule'
 import { SettingsPage } from './pages/Settings'
-import { StudyPlanPage } from './pages/StudyPlan'
-import { SubjectsPage } from './pages/Subjects'
-import { TasksPage } from './pages/Tasks'
-import { TrainingPage } from './pages/Training'
 
 /** Undersidor som hör till en flik markerar den fliken i menyn. */
 const TABS = [
-  { to: '/', label: 'Hem', also: ['/uppgifter', '/paminnelser', '/installningar', '/traning'] as string[] },
-  { to: '/schema', label: 'Schema', also: ['/amnen'] },
-  { to: '/kalender', label: 'Kalender', also: ['/plugg'] },
-  { to: '/mat', label: 'Mat', also: [] },
+  { to: '/', label: 'Meny', also: ['/kost', '/installningar'] as string[] },
+  { to: '/recept', label: 'Recept', also: [] },
+  { to: '/lager', label: 'Lager', also: ['/skanna'] },
+  { to: '/inkop', label: 'Inköp', also: [] },
   { to: '/chatt', label: 'Chatt', also: [] },
 ]
 
@@ -60,7 +50,6 @@ export function App() {
   useSyncRunner()
   useApplyBackground()
   useNotificationSync()
-  useGoogleAutoSync()
   const settings = useSettings()
   const session = useSession()
   const theme = settings?.theme
@@ -81,18 +70,13 @@ export function App() {
           <LoginScreen />
         ) : (
           <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/schema" element={<SchedulePage />} />
-            <Route path="/schema/importera" element={<ImportSchedulePage />} />
-            <Route path="/kalender" element={<CalendarPage />} />
-            <Route path="/plugg" element={<StudyPlanPage />} />
+            <Route path="/" element={<MenuPage />} />
+            <Route path="/recept" element={<RecipesPage />} />
+            <Route path="/lager" element={<PantryPage />} />
+            <Route path="/inkop" element={<ShoppingPage />} />
+            <Route path="/kost" element={<NutritionPage />} />
+            <Route path="/skanna" element={<ScanFoodPage />} />
             <Route path="/chatt" element={<ChatPage />} />
-            <Route path="/amnen" element={<SubjectsPage />} />
-            <Route path="/uppgifter" element={<TasksPage />} />
-            <Route path="/traning" element={<TrainingPage />} />
-            <Route path="/mat" element={<FoodPage />} />
-            <Route path="/mat/skanna" element={<ScanFoodPage />} />
-            <Route path="/paminnelser" element={<RemindersPage />} />
             <Route path="/installningar" element={<SettingsPage />} />
             <Route path="/installningar/:del" element={<SettingsPage />} />
           </Routes>

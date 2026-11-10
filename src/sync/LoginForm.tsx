@@ -85,9 +85,9 @@ export function LoginForm({ intro }: { intro?: string }) {
 export function LoginScreen() {
   return (
     <div className="login">
-      <div className="eyebrow">Studieassistent</div>
+      <div className="eyebrow">Matplaneraren</div>
       <h1>Välkommen</h1>
-      <p className="muted">Schema, kalender, mat och träning på ett ställe. Logga in en gång per enhet, så följer allt med mellan mobil och dator.</p>
+      <p className="muted">Planera veckans mat, håll koll på det du har hemma och handla smart. Logga in en gång per enhet, så följer allt med mellan mobil och dator.</p>
       <div className="card login-card">
         <LoginForm />
       </div>

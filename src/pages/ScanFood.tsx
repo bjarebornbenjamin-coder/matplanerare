@@ -71,12 +71,12 @@ export function ScanFoodPage() {
 
   async function save() {
     await addPantryItems(chosen.map((r) => ({ name: r.name, amount: r.amount, expires: r.expires || undefined })), kind, { clearFromList: kind === 'receipt' })
-    navigate('/mat')
+    navigate('/lager')
   }
 
   return (
     <>
-      <Link to="/mat" className="back">‹ Tillbaka till Mat</Link>
+      <Link to="/lager" className="back">‹ Tillbaka till Lager</Link>
       <h1>{t.title}</h1>
       <p className="lead">{t.lead}</p>
       <ImageUpload title={t.box} hint={t.hint} button={t.button} busy={busy} done={Boolean(rows)} onFile={onFile} />
@@ -127,7 +127,7 @@ export function ScanFoodPage() {
             <button type="button" className="btn primary" disabled={chosen.length === 0} onClick={save}>
               Lägg {chosen.length} {chosen.length === 1 ? 'vara' : 'varor'} i lagret{clearing.length > 0 ? ` (${clearing.length} tas bort från listan)` : ''}
             </button>
-            <Link to="/mat" className="btn">Avbryt</Link>
+            <Link to="/lager" className="btn">Avbryt</Link>
           </div>
         </>
       )}

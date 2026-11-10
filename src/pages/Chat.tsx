@@ -7,34 +7,24 @@ import { loadToolContext } from '../ai/context'
 import { authHeaders } from '../lib/auth'
 import { addChatMessage, clearChat, setCardStatus } from '../db/repo'
 import { Markdown } from '../components/Markdown'
-import type { ChatMessage, Subject } from '../domain/types'
-import { useAiConfig, useChat, useSubjects } from '../hooks'
+import type { ChatMessage } from '../domain/types'
+import { useAiConfig, useChat } from '../hooks'
 
 const QUICK_QUESTIONS = [
-  { label: 'Vad har jag imorgon?', text: 'Vad har jag imorgon? Ta med lektioner, händelser, uppgifter och påminnelser.' },
-  { label: 'Vad ska jag packa?', text: 'Vad ska jag packa?' },
-  { label: 'Vad händer denna vecka?', text: 'Vad händer denna vecka? Ta med lektioner, händelser, uppgifter och påminnelser.' },
-  { label: 'Vad ska jag äta idag?', text: 'Vad ska jag äta idag?' },
+  { label: 'Vad blir det till middag?', text: 'Vad blir det till middag ikväll?' },
+  { label: 'Vad kan jag laga?', text: 'Vad kan jag laga med det jag har hemma?' },
+  { label: 'Vad går ut snart?', text: 'Vad i lagret går ut snart, och vad kan jag laga med det?' },
   { label: 'Hur ligger jag till idag?', text: 'Hur ligger jag till idag med mina mål för protein, kolhydrater, fett och vatten?' },
 ]
 
-export function mailtoUrl(to: string, subject: string, body: string): string {
-  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-}
-
-function Card({ m, subjects }: { m: ChatMessage; subjects: Subject[] }) {
+function Card({ m }: { m: ChatMessage }) {
   const card = m.card
   if (!card) return null
   const status = m.cardStatus ?? 'pending'
-  const view = cardView(card, subjects)
+  const view = cardView(card)
 
   async function confirm() {
     if (!card) return
-    if (card.type === 'email') {
-      window.location.href = mailtoUrl(card.to, card.subject, card.body)
-      await setCardStatus(m.id, 'done')
-      return
-    }
     await setCardStatus(m.id, await applyCard(card))
   }
 
@@ -43,7 +33,6 @@ function Card({ m, subjects }: { m: ChatMessage; subjects: Subject[] }) {
       <div className="sub">{view.kicker}</div>
       <div className="title">{view.title}</div>
       {view.lines.map((l, i) => <div key={i} className="sub note">{l}</div>)}
-      {card.type === 'email' && <p className="note" style={{ marginTop: 8 }}>{card.body}</p>}
       {status === 'pending' ? (
         <div className="actions" style={{ marginTop: 8 }}>
           <button type="button" className={`btn ${view.danger ? 'danger' : 'primary'}`} onClick={confirm}>{view.confirmLabel}</button>
@@ -61,7 +50,6 @@ function Card({ m, subjects }: { m: ChatMessage; subjects: Subject[] }) {
 export function ChatPage() {
   const config = useAiConfig()
   const messages = useChat()
-  const subjects = useSubjects()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirmingAll, setConfirmingAll] = useState(false)
@@ -81,12 +69,12 @@ export function ChatPage() {
     return () => ro.disconnect()
   })
 
-  const ready = Boolean(config && messages && subjects)
+  const ready = Boolean(config && messages)
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [messages?.length, busy, error, ready])
 
-  if (!config || !messages || !subjects) return null
+  if (!config || !messages) return null
 
   async function send(e: FormEvent) {
     e.preventDefault()
@@ -131,17 +119,17 @@ export function ChatPage() {
 
       <div className="chat" aria-live="polite">
         {messages.length === 0 && (
-          <p className="empty">Fråga t.ex. "Vad har jag på schemat idag?", "Vad ska jag ta med imorgon?" eller "Skriv ett mejl till Anna om läxan".</p>
+          <p className="empty">Fråga t.ex. "Vad blir det till middag?", "Vad kan jag laga med det jag har hemma?" eller "Lägg mjölk och ägg på inköpslistan".</p>
         )}
         {messages.map((m) =>
           m.card ? (
-            <Card key={m.id} m={m} subjects={subjects} />
+            <Card key={m.id} m={m} />
           ) : (
             <div key={m.id} className={`bubble ${m.role}`}>{m.role === 'assistant' ? <Markdown text={m.content} /> : m.content}</div>
           ),
         )}
         {(() => {
-          const pending = messages.filter((m) => m.card && m.card.type !== 'email' && (m.cardStatus ?? 'pending') === 'pending')
+          const pending = messages.filter((m) => m.card && (m.cardStatus ?? 'pending') === 'pending')
           if (pending.length < 2) return null
           return (
             <div className="actions" style={{ marginTop: 0 }}>

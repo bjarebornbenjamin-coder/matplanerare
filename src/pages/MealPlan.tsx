@@ -7,22 +7,19 @@ import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
 import { MealForm } from '../components/MealForm'
 import { db } from '../db/db'
-import { addShoppingItems, getSettings } from '../db/repo'
-import { dayLabel } from '../domain/calendar'
-import { addDays, toHHmm, toISODate } from '../domain/dates'
+import { addShoppingItems, getSettings, saveSettings } from '../db/repo'
+import { WEEKDAYS_SHORT, addDays, dayLabel, toHHmm, toISODate } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
 import { recipeSearchUrl } from '../domain/recipeLink'
 import { findRecipes, splitIngredient } from '../ai/recipeSearch'
 import type { PlannedDinner } from '../domain/types'
-import { useAiConfig, useEvents, useLessons, useMealPlan, useNow, usePantry, useSettings } from '../hooks'
+import { useAiConfig, useMealPlan, useNow, usePantry, useSettings } from '../hooks'
 import { authHeaders } from '../lib/auth'
 import { undoable } from '../lib/undo'
 
 export function MealPlanTab() {
   const plan = useMealPlan()
   const pantry = usePantry()
-  const lessons = useLessons()
-  const events = useEvents()
   const settings = useSettings()
   const config = useAiConfig()
   const now = useNow()
@@ -34,7 +31,7 @@ export function MealPlanTab() {
   const [finding, setFinding] = useState<Set<string>>(new Set())
   const [notFound, setNotFound] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
-  if (!plan || !pantry || !lessons || !events || !settings) return null
+  if (!plan || !pantry || !settings) return null
 
   const upcoming = plan.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date))
   const missing = missingForPlan(upcoming, pantry)
@@ -74,7 +71,7 @@ export function MealPlanTab() {
       const recent = plan!.filter((d) => d.date < from && d.date >= addDays(from, -14)).map((d) => d.title)
       const usable = pantry!.filter((p) => !p.expires || p.expires >= today)
       const result = await fetchMealPlan(
-        { days: dates.map((d) => dayContext(d, lessons!, events!, s)), pantry: usable, food: s.food, goals: s.nutrition, memories: s.memories, recent, today },
+        { days: dates.map((d) => dayContext(d, s.food)), pantry: usable, food: s.food, goals: s.nutrition, memories: s.memories, recent, today },
         config?.model ?? 'gpt-4o-mini',
         await authHeaders(),
       )
@@ -106,6 +103,8 @@ export function MealPlanTab() {
       <p className="muted">
         Middagar för de kommande dagarna, utifrån lagret, dina mål och hur dagarna ser ut (snabbt när du har mycket, proteinrikt när du tränar). AI-genererat: kolla allergier.
       </p>
+      <WeekdayPicker label="Kort om tid (snabba middagar)" days={settings.food.quickWeekdays} onChange={(quickWeekdays) => saveSettings({ food: { ...settings.food, quickWeekdays } })} />
+      <WeekdayPicker label="Träningsdagar (proteinrikt)" days={settings.food.trainingWeekdays} onChange={(trainingWeekdays) => saveSettings({ food: { ...settings.food, trainingWeekdays } })} />
       <div className="actions" style={{ marginTop: 8 }}>
         <label className="inline-field">
           <span>Dagar</span>
@@ -173,5 +172,25 @@ export function MealPlanTab() {
         <MealForm key={eating.id} meal={null} date={today} draft={{ name: eating.title, source: 'recipe', ...(eating.nutrition ?? {}) }} onClose={() => setEating(null)} />
       )}
     </>
+  )
+}
+
+/** Veckodagar som knappar, t.ex. för dagar med ont om tid. */
+function WeekdayPicker({ label, days, onChange }: { label: string; days: number[]; onChange: (days: number[]) => void }) {
+  return (
+    <fieldset className="weekday-picker">
+      <legend>{label}</legend>
+      <div className="weekday-row">
+        {WEEKDAYS_SHORT.map((d, i) => {
+          const wd = i + 1
+          const on = days.includes(wd)
+          return (
+            <button key={d} type="button" className="chip" aria-pressed={on} aria-label={`${d}${on ? ', vald' : ''}`} onClick={() => onChange(on ? days.filter((x) => x !== wd) : [...days, wd].sort())}>
+              {d}
+            </button>
+          )
+        })}
+      </div>
+    </fieldset>
   )
 }

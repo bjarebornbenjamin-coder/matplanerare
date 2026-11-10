@@ -5,7 +5,6 @@ import { authHeaders } from '../lib/auth'
 import { supabase, useSession } from '../sync/supabase'
 import { currentSubscription, pushSupported, subscribeDevice, unsubscribeDevice, vapidKey } from './push'
 
-const BEFORE_OPTIONS = [0, 5, 10, 15, 30]
 const WEEKDAY_NAMES = ['måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag', 'söndag']
 
 export function NotifySection() {
@@ -23,7 +22,6 @@ export function NotifySection() {
   }, [refresh])
 
   if (!settings) return null
-  const n = settings.notify
   const food = settings.food
 
   const head = null
@@ -34,7 +32,7 @@ export function NotifySection() {
     return <>{head}<p className="muted">Notiser är inte påslagna på den här installationen. Se README (avsnittet Push-notiser).</p></>
   }
   if (!session) {
-    return <>{head}<p className="muted">Logga in under Synk ovan för att kunna få notiser. Servern behöver veta vem du är för att skicka till rätt enhet.</p></>
+    return <>{head}<p className="muted">Logga in under Synk mellan enheter för att kunna få notiser. Servern behöver veta vem du är för att skicka till rätt enhet.</p></>
   }
   const client = supabase
   const userId = session.user.id
@@ -66,47 +64,8 @@ export function NotifySection() {
       {head}
       <div className="checks" style={{ marginBottom: 8 }}>
         <label>
-          <input type="checkbox" checked={n.morning} onChange={(e) => saveSettings({ notify: { ...n, morning: e.target.checked } })} />
-          Morgonöversikt: dagens lektioner, packlista, deadlines, händelser och mat som går ut
-        </label>
-      </div>
-      {n.morning && (
-        <label className="field">
-          <span>Tid för morgonöversikt</span>
-          <input type="time" value={n.morningTime} onChange={(e) => e.target.value && saveSettings({ notify: { ...n, morningTime: e.target.value } })} />
-        </label>
-      )}
-      <div className="checks" style={{ marginBottom: 8 }}>
-        <label>
-          <input type="checkbox" checked={n.evening} onChange={(e) => saveSettings({ notify: { ...n, evening: e.target.checked } })} />
-          Kvällsnotis med morgondagens lektioner och packlista
-        </label>
-      </div>
-      {n.evening && (
-        <label className="field">
-          <span>Tid för kvällsnotis</span>
-          <input type="time" value={n.eveningTime} onChange={(e) => e.target.value && saveSettings({ notify: { ...n, eveningTime: e.target.value } })} />
-        </label>
-      )}
-      <div className="checks" style={{ marginBottom: 8 }}>
-        <label>
-          <input type="checkbox" checked={n.before} onChange={(e) => saveSettings({ notify: { ...n, before: e.target.checked } })} />
-          Notis före varje lektion
-        </label>
-      </div>
-      {n.before && (
-        <label className="field">
-          <span>Hur långt före</span>
-          <select value={n.beforeMinutes} onChange={(e) => saveSettings({ notify: { ...n, beforeMinutes: Number(e.target.value) } })}>
-            {BEFORE_OPTIONS.map((m) => <option key={m} value={m}>{m === 0 ? 'Vid start' : `${m} minuter före`}</option>)}
-          </select>
-        </label>
-      )}
-
-      <div className="checks" style={{ marginBottom: 8 }}>
-        <label>
           <input type="checkbox" checked={food.expiry.enabled} onChange={(e) => saveSettings({ food: { ...food, expiry: { ...food.expiry, enabled: e.target.checked } } })} />
-          Notis när mat snart går ut
+          Notis när mat snart går ut (med kvällens middag om den är planerad)
         </label>
       </div>
       {food.expiry.enabled && (
@@ -151,7 +110,7 @@ export function NotifySection() {
       </div>
       {message && <p className="muted" role="status">{message}</p>}
       <p className="muted">
-        Notiserna planeras 14 dagar framåt varje gång du öppnar appen eller ändrar schema och packlistor. Öppna appen minst varannan vecka.
+        Notiserna planeras 14 dagar framåt varje gång du öppnar appen eller ändrar matlagret eller inköpslistan. Öppna appen minst varannan vecka.
       </p>
     </>
   )

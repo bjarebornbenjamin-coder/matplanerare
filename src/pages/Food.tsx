@@ -1,11 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { AiProgress } from '../components/AiProgress'
 import { DoneButton } from '../components/DoneButton'
-import { Link, useSearchParams } from 'react-router-dom'
-import { NutritionTab } from './Nutrition'
+import { Link } from 'react-router-dom'
 import { MealForm } from '../components/MealForm'
 import { PantryForm } from '../components/PantryForm'
-import { MealPlanTab } from './MealPlan'
 import { MODE_LABELS, findRecipes, ingredientStatuses, type FoundRecipe, type IngredientLine, type RecipeMode } from '../ai/recipeSearch'
 import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, runOut, saveSettings, saveShoppingItem } from '../db/repo'
 import { toISODate } from '../domain/dates'
@@ -14,8 +12,6 @@ import type { PantryItem } from '../domain/types'
 import { useFieldError, useNow, usePantry, useSettings, useShopping } from '../hooks'
 import { authHeaders } from '../lib/auth'
 import { undoable } from '../lib/undo'
-
-type Tab = 'lager' | 'inkop' | 'recept' | 'meny' | 'kost'
 
 function RunOutDialog({ item, onClose }: { item: PantryItem; onClose: () => void }) {
   const done = async (addToList: boolean) => {
@@ -36,7 +32,7 @@ function RunOutDialog({ item, onClose }: { item: PantryItem; onClose: () => void
   )
 }
 
-function PantryTab() {
+export function PantryTab() {
   const pantry = usePantry()
   const today = toISODate(useNow())
   const [editing, setEditing] = useState<PantryItem | 'new' | null>(null)
@@ -54,8 +50,8 @@ function PantryTab() {
       </p>
       <div className="actions" style={{ marginTop: 0, marginBottom: 12 }}>
         <button type="button" className="btn primary" onClick={() => setEditing('new')}>Lägg till vara</button>
-        <Link to="/mat/skanna?typ=kvitto" className="btn">Skanna kvitto</Link>
-        <Link to="/mat/skanna?typ=kylskap" className="btn">Skanna kylskåp</Link>
+        <Link to="/skanna?typ=kvitto" className="btn">Skanna kvitto</Link>
+        <Link to="/skanna?typ=kylskap" className="btn">Skanna kylskåp</Link>
       </div>
       {sorted.map((i) => {
         const status = expiryStatus(i.expires, today)
@@ -75,7 +71,7 @@ function PantryTab() {
   )
 }
 
-function ShoppingTab() {
+export function ShoppingTab() {
   const shopping = useShopping()
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
@@ -141,7 +137,7 @@ function ShoppingTab() {
 
 const MODE_KEY = 'recipe-mode'
 
-function RecipesTab() {
+export function RecipesTab() {
   const pantry = usePantry()
   const settings = useSettings()
   const today = toISODate(useNow())
@@ -278,27 +274,6 @@ function RecipesTab() {
         )
       })}
       {eating && <MealForm key={eating.url} meal={null} date={today} draft={{ name: eating.title, source: 'recipe' }} onClose={() => setEating(null)} />}
-    </>
-  )
-}
-
-export function FoodPage() {
-  const [params, setParams] = useSearchParams()
-  const v = params.get('v')
-  const tab: Tab = v === 'inkop' ? 'inkop' : v === 'recept' ? 'recept' : v === 'meny' ? 'meny' : v === 'kost' ? 'kost' : 'lager'
-  const select = (t: Tab) => setParams(t === 'lager' ? {} : { v: t }, { replace: true })
-
-  return (
-    <>
-      <h1>Mat</h1>
-      <div className="seg" role="group" aria-label="Avsnitt">
-        <button type="button" className="tab" aria-pressed={tab === 'lager'} onClick={() => select('lager')}>Lager</button>
-        <button type="button" className="tab" aria-pressed={tab === 'inkop'} onClick={() => select('inkop')}>Inköp</button>
-        <button type="button" className="tab" aria-pressed={tab === 'recept'} onClick={() => select('recept')}>Recept</button>
-        <button type="button" className="tab" aria-pressed={tab === 'meny'} onClick={() => select('meny')}>Meny</button>
-        <button type="button" className="tab" aria-pressed={tab === 'kost'} onClick={() => select('kost')}>Kost</button>
-      </div>
-      {tab === 'lager' ? <PantryTab /> : tab === 'inkop' ? <ShoppingTab /> : tab === 'recept' ? <RecipesTab /> : tab === 'meny' ? <MealPlanTab /> : <NutritionTab />}
     </>
   )
 }

@@ -1,7 +1,7 @@
 import { useRef, type ReactNode } from 'react'
 
 interface Props {
-  /** Huvudtext i rutan, t.ex. "Välj en bild av schemat". */
+  /** Huvudtext i rutan, t.ex. "Välj en bild av kvittot". */
   title: string
   /** Kort hjälptext under, t.ex. "Skärmdump eller foto". */
   hint: string

@@ -47,3 +47,8 @@ export function isoWeek(s: ISODate): number {
   const year = Number(thursday.slice(0, 4))
   return Math.floor(daysBetween(`${year}-01-01`, thursday) / 7) + 1
 }
+
+/** "tisdag 10 november" */
+export function dayLabel(date: ISODate): string {
+  return parseISODate(date).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
+}

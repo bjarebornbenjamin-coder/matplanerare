@@ -2,21 +2,18 @@ import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { syncConfigured, useSession } from '../sync/supabase'
 import { useNotifyStatus } from '../push/useNotifyStatus'
-import { GOOGLE_CLIENT_ID, useGoogleState } from '../google/google'
 import { DEFAULT_MODEL, FALLBACK_MODELS, fetchModels } from '../ai/models'
 import { NotifySection } from '../push/NotifySection'
 import { SyncSection } from '../sync/SyncSection'
-import { GoogleSection } from '../google/GoogleSection'
 import { diagnose, type Diagnosis } from '../ai/diagnose'
 import { setBackgroundImage, setBackgroundVeil, useBackground } from '../lib/background'
 import { imageToDataUrl } from '../lib/image'
 import { authHeaders } from '../lib/auth'
 import { parseBackup } from '../db/backup'
-import { deleteContact, exportAll, importAll, newId, saveAiConfig, saveContact, saveSettings } from '../db/repo'
+import { exportAll, importAll, saveAiConfig, saveSettings } from '../db/repo'
 import { toISODate } from '../domain/dates'
 import type { Theme } from '../domain/types'
-import { anchorFor, cycleLabel, weekIndex } from '../domain/weekCycle'
-import { useAiConfig, useContacts, useFieldError, useSettings } from '../hooks'
+import { useAiConfig, useFieldError, useSettings } from '../hooks'
 
 const THEMES: { value: Theme; label: string }[] = [
   { value: 'system', label: 'Som enheten' },
@@ -208,64 +205,23 @@ function MemorySection() {
   )
 }
 
-function ContactsSection() {
-  const contacts = useContacts()
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const { error, fail, touch } = useFieldError()
-  if (!contacts) return null
-
-  async function add(e: FormEvent) {
-    e.preventDefault()
-    if (!name.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) return fail('contact', 'Ange namn och en giltig e-postadress.')
-    await saveContact({ id: newId(), name: name.trim(), email: email.trim() })
-    setName('')
-    setEmail('')
-  }
-
-  return (
-    <>
-      <p className="muted">Används av assistenten för att veta vem "Anna" är när du ber den skriva ett mejl.</p>
-      {contacts.map((c) => (
-        <div className="contact-row" key={c.id}>
-          <span className="title">{c.name}</span>
-          <span className="sub" style={{ overflowWrap: 'anywhere' }}>{c.email}</span>
-          <button type="button" className="btn danger" aria-label={`Ta bort ${c.name}`} onClick={() => deleteContact(c.id)}>Ta bort</button>
-        </div>
-      ))}
-      <form onSubmit={add}>
-        <div className="two">
-          <input type="text" aria-label="Kontaktens namn" placeholder="Namn" value={name} onChange={(e) => { setName(e.target.value); touch('contact') }} />
-          <input type="text" inputMode="email" aria-label="Kontaktens e-post" placeholder="E-post" value={email} onChange={(e) => { setEmail(e.target.value); touch('contact') }} />
-        </div>
-        {error && <p className="error" role="alert">{error}</p>}
-        <div className="actions"><button type="submit" className="btn">Lägg till kontakt</button></div>
-      </form>
-    </>
-  )
-}
-
 export function SettingsPage() {
   const { del } = useParams()
   const settings = useSettings()
   const config = useAiConfig()
-  const contacts = useContacts()
   const session = useSession()
   const notify = useNotifyStatus()
-  const google = useGoogleState()
   const background = useBackground()
   const fileRef = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
   if (!settings) return null
 
-  const today = toISODate(new Date())
-  const currentWeek = weekIndex(today, settings.cycleAnchor, settings.cycleLength)
 
   async function download() {
     const blob = new Blob([JSON.stringify(await exportAll(), null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `studieassistent-${toISODate(new Date())}.json`
+    a.download = `matplaneraren-${toISODate(new Date())}.json`
     a.click()
     URL.revokeObjectURL(a.href)
     setMessage({ text: `Säkerhetskopia sparad som ${a.download} (i Hämtade filer).`, error: false })
@@ -274,7 +230,7 @@ export function SettingsPage() {
   async function upload(file: File) {
     try {
       const backup = parseBackup(JSON.parse(await file.text()))
-      if (!confirm(`Importen ersätter ALL data i appen (${backup.subjects.length} ämnen, ${backup.lessons.length} lektioner, ${backup.events.length} händelser). Fortsätta?`)) return
+      if (!confirm(`Importen ersätter ALL data i appen (${backup.pantry.length} varor i lagret, ${backup.mealPlan.length} middagar i menyn). Fortsätta?`)) return
       await importAll(backup)
       setMessage({ text: 'Importen är klar.', error: false })
     } catch (e) {
@@ -285,30 +241,6 @@ export function SettingsPage() {
   }
 
   const sections: Record<string, { title: string; body: ReactNode }> = {
-    veckor: {
-      title: 'Schema och veckor',
-      body: (
-        <>
-          <label className="field">
-            <span>Hur skiljer sig veckorna åt?</span>
-            <select value={settings.cycleLength} onChange={(e) => saveSettings({ cycleLength: Number(e.target.value), cycleAnchor: anchorFor(today, 0) })}>
-              <option value={1}>Samma schema varje vecka</option>
-              <option value={2}>A/B-veckor</option>
-              <option value={3}>3 olika veckor (A/B/C)</option>
-              <option value={4}>4 olika veckor (A/B/C/D)</option>
-            </select>
-          </label>
-          {settings.cycleLength > 1 && (
-            <label className="field">
-              <span>Den här veckan är</span>
-              <select value={currentWeek} onChange={(e) => saveSettings({ cycleAnchor: anchorFor(today, Number(e.target.value)) })}>
-                {Array.from({ length: settings.cycleLength }, (_, i) => <option key={i} value={i}>Vecka {cycleLabel(i)}</option>)}
-              </select>
-            </label>
-          )}
-        </>
-      ),
-    },
     utseende: {
       title: 'Utseende',
       body: (
@@ -325,11 +257,9 @@ export function SettingsPage() {
       ),
     },
     synk: { title: 'Synk mellan enheter', body: <SyncSection /> },
-    google: { title: 'Google Kalender', body: <GoogleSection /> },
     notiser: { title: 'Notiser', body: <NotifySection /> },
     ai: { title: 'AI-assistent', body: <AiSection /> },
     minne: { title: 'Assistentens minne', body: <MemorySection /> },
-    kontakter: { title: 'Kontakter', body: <ContactsSection /> },
     sakerhetskopia: {
       title: 'Säkerhetskopia',
       body: (
@@ -358,12 +288,10 @@ export function SettingsPage() {
   }
 
   const theme = THEMES.find((t) => t.value === settings.theme)!.label
-  const n = settings.notify
   const groups: { title: string; rows: { to: string; title: string; status: string }[] }[] = [
     {
       title: 'Allmänt',
       rows: [
-        { to: 'veckor', title: 'Schema och veckor', status: settings.cycleLength === 1 ? 'Samma schema varje vecka' : `${['', '', 'A/B', 'A/B/C', 'A/B/C/D'][settings.cycleLength]}-veckor, nu vecka ${cycleLabel(currentWeek)}` },
         { to: 'utseende', title: 'Utseende', status: `${theme}${background?.image ? ', egen bakgrundsbild' : ''}` },
       ],
     },
@@ -371,8 +299,7 @@ export function SettingsPage() {
       title: 'Kopplingar',
       rows: [
         { to: 'synk', title: 'Synk mellan enheter', status: !syncConfigured ? 'Inte installerad' : session ? `Inloggad som ${session.user.email}` : 'Inte inloggad' },
-        { to: 'notiser', title: 'Notiser', status: !notify ? '' : notify.on ? [n.morning && `morgon ${n.morningTime}`, n.evening && `kväll ${n.eveningTime}`].filter(Boolean).join(', ').replace(/^./, (c) => c.toUpperCase()) || 'På' : 'Av' },
-        { to: 'google', title: 'Google Kalender', status: !GOOGLE_CLIENT_ID ? 'Inte installerad' : google?.connected ? `Kopplad, ${google.count ?? 0} händelser` : 'Inte kopplad' },
+        { to: 'notiser', title: 'Notiser', status: !notify ? '' : notify.on ? [settings.food.expiry.enabled && 'mat som går ut', settings.food.shopping.enabled && 'inköpslistan'].filter(Boolean).join(', ').replace(/^./, (c) => c.toUpperCase()) || 'På' : 'Av' },
       ],
     },
     {
@@ -380,7 +307,6 @@ export function SettingsPage() {
       rows: [
         { to: 'ai', title: 'AI-assistent', status: `${config?.model ?? DEFAULT_MODEL}${config?.password ? ', lösenord sparat' : ''}` },
         { to: 'minne', title: 'Assistentens minne', status: settings.memories.length ? `${settings.memories.length} ${settings.memories.length === 1 ? 'sak' : 'saker'}` : 'Inget sparat' },
-        { to: 'kontakter', title: 'Kontakter', status: contacts?.length ? `${contacts.length} ${contacts.length === 1 ? 'kontakt' : 'kontakter'}` : 'Inga kontakter' },
       ],
     },
     { title: 'Data', rows: [{ to: 'sakerhetskopia', title: 'Säkerhetskopia', status: 'Exportera eller importera all data' }] },
@@ -388,7 +314,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <Link to="/" className="back">‹ Tillbaka till Hem</Link>
+      <Link to="/" className="back">‹ Tillbaka</Link>
       <h1>Inställningar</h1>
       {groups.map((g) => (
         <section key={g.title} aria-label={g.title}>

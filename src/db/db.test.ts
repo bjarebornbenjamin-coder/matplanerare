@@ -1,155 +1,37 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { parseBackup } from './backup'
 import { db } from './db'
-import { addChatMessage, addWater, assignMissingColors, saveMeal, addPantryItems, addShoppingItems, addSubject, changePackItems, clearBought, moveBoughtToPantry, runOut, deleteSubject, exportAll, getSettings, importAll, importLessons, newId, purgeLegacyApiKey, saveEvent, saveLesson, setPackChecked, saveSettings, updateSubject } from './repo'
-
-const lesson = (subjectId: string, weeks: number[] | null) => ({
-  id: newId(), subjectId, weekday: 1, start: '08:00', end: '09:00', room: 'A1', teacher: 'Lena', weeks,
-})
+import { addChatMessage, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveMeal, saveSettings } from './repo'
 
 beforeEach(async () => {
-  await Promise.all([db.settings.clear(), db.subjects.clear(), db.lessons.clear(), db.events.clear(), db.contacts.clear(), db.chat.clear(), db.aiConfig.clear(), db.packChecks.clear(), db.tasks.clear(), db.reminders.clear(), db.pantry.clear(), db.shopping.clear(), db.meals.clear(), db.water.clear()])
+  await Promise.all([db.settings.clear(), db.chat.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.meals.clear(), db.water.clear(), db.mealPlan.clear()])
 })
 
-describe('repo', () => {
-  it('tar bort lektioner när ämnet tas bort', async () => {
-    const s = await addSubject(' Matte ')
-    expect(s.name).toBe('Matte')
-    await saveLesson(lesson(s.id, null))
-    await deleteSubject(s.id)
-    expect(await db.lessons.count()).toBe(0)
-  })
-
-  it('rättar lektionernas veckor när cykeln ändras', async () => {
-    const s = await addSubject('Matte')
-    const onlyB = lesson(s.id, [1])
-    const both = lesson(s.id, [0, 1])
-    await saveLesson(onlyB)
-    await saveLesson(both)
-    await saveSettings({ cycleLength: 2 })
-    expect((await db.lessons.get(both.id))!.weeks).toBeNull() // alla veckor = null
-    expect((await db.lessons.get(onlyB.id))!.weeks).toEqual([1])
-    await saveSettings({ cycleLength: 1 })
-    expect((await db.lessons.get(onlyB.id))!.weeks).toBeNull()
-  })
-
-  it('export → import ger samma data', async () => {
-    const s = await addSubject('Matte')
-    await updateSubject({ ...s, packItems: [{ id: newId(), text: 'miniräknare' }] })
-    await saveLesson(lesson(s.id, [0]))
-    await saveSettings({ cycleLength: 2, theme: 'dark' })
+describe('export och import', () => {
+  it('ger samma data tillbaka', async () => {
+    await saveSettings({ memories: ['Gillar inte svamp'], food: { ...(await getSettings()).food, allergies: 'nötter', quickWeekdays: [2, 4] } })
+    await db.pantry.put({ id: 'p1', name: 'Mjölk', amount: '1 l', expires: '2026-11-12', addedAt: '2026-11-08', source: 'receipt', updatedAt: '' })
+    await db.shopping.put({ id: 's1', name: 'Ägg', done: false, addedAt: '2026-11-08', updatedAt: '' })
+    await saveMeal({ id: 'm1', date: '2026-11-10', name: 'Gröt', protein: 10, carbs: 50, fat: 5, source: 'manual', updatedAt: '' })
+    await addWater('2026-11-10', 500)
+    await db.mealPlan.put({ id: '2026-11-11', date: '2026-11-11', title: 'Pasta carbonara', reason: '', portions: 2, minutes: 25, ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: [], url: 'https://www.ica.se/recept/x/', site: 'ica.se', updatedAt: '' })
     const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    await Promise.all([db.settings.clear(), db.subjects.clear(), db.lessons.clear(), db.events.clear(), db.contacts.clear(), db.chat.clear(), db.aiConfig.clear(), db.packChecks.clear(), db.tasks.clear(), db.reminders.clear(), db.pantry.clear(), db.shopping.clear(), db.meals.clear(), db.water.clear()])
+    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.meals.clear(), db.water.clear(), db.mealPlan.clear()])
     await importAll(backup)
-    expect((await getSettings()).theme).toBe('dark')
-    expect(await db.subjects.count()).toBe(1)
-    expect((await db.lessons.toArray())[0].weeks).toEqual([0])
+    const s = await getSettings()
+    expect(s.memories).toEqual(['Gillar inte svamp'])
+    expect(s.food).toMatchObject({ allergies: 'nötter', quickWeekdays: [2, 4] })
+    expect((await db.pantry.get('p1'))?.expires).toBe('2026-11-12')
+    expect((await db.shopping.get('s1'))?.name).toBe('Ägg')
+    expect((await db.meals.get('m1'))?.name).toBe('Gröt')
+    expect((await db.water.get('2026-11-10'))?.ml).toBe(500)
+    expect(await db.mealPlan.get('2026-11-11')).toMatchObject({ title: 'Pasta carbonara', url: 'https://www.ica.se/recept/x/' })
   })
-})
-
-describe('parseBackup', () => {
-  it('avvisar fel filer', () => {
-    expect(() => parseBackup({})).toThrow(/inte från appen/)
-    expect(() => parseBackup({ app: 'studieassistent', version: 9 })).toThrow(/version/)
-    expect(() =>
-      parseBackup({ app: 'studieassistent', version: 1, settings: null, subjects: [], lessons: [{ id: 'x', subjectId: 'y', weekday: 1, start: '08:00', end: '09:00', room: '', teacher: '', weeks: null }] }),
-    ).toThrow(/ämne som inte finns/)
-    expect(() =>
-      parseBackup({ app: 'studieassistent', version: 1, settings: null, subjects: [], lessons: [{ id: 'x', subjectId: 'y', weekday: 9, start: '08:00', end: '09:00', room: '', teacher: '', weeks: null }] }),
-    ).toThrow(/veckodag/)
-  })
-})
-
-describe('changePackItems', () => {
-  it('förlorar inga ändringar vid snabba anrop efter varandra', async () => {
-    const s = await addSubject('Matte')
-    await Promise.all(['a', 'b', 'c'].map((text) => changePackItems(s.id, (items) => [...items, { id: newId(), text }])))
-    expect((await db.subjects.get(s.id))!.packItems.map((i) => i.text).sort()).toEqual(['a', 'b', 'c'])
-  })
-})
-
-describe('händelser', () => {
-  it('export → import behåller händelser, och version 1 utan händelser går att läsa', async () => {
-    await saveEvent({ id: newId(), title: 'Prov i matte', date: '2026-11-12', start: '09:00', note: 'kap 4', updatedAt: '' })
-    await saveEvent({ id: newId(), title: 'Inlämning', date: '2026-11-13', note: '', updatedAt: '' })
-    const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    expect(backup.events).toHaveLength(2)
-    await db.events.clear()
-    await importAll(backup)
-    expect((await db.events.toArray()).map((e) => e.title).sort()).toEqual(['Inlämning', 'Prov i matte'])
-    const old = parseBackup({ app: 'studieassistent', version: 1, settings: null, subjects: [], lessons: [] })
-    expect(old.events).toEqual([])
-  })
-  it('avvisar sluttid utan starttid', () => {
-    const bad = { app: 'studieassistent', version: 2, subjects: [], lessons: [], events: [{ id: 'x', title: 't', date: '2026-11-12', end: '10:00', note: '' }] }
-    expect(() => parseBackup(bad)).toThrow(/sluttid/)
-  })
-})
-
-describe('ämnesfärg', () => {
-  it('nya ämnen får olika färger och färgen följer med export/import', async () => {
-    const a = await addSubject('A')
-    const b = await addSubject('B')
-    expect(a.color).toMatch(/^#/)
-    expect(b.color).not.toBe(a.color)
-    const copy = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    expect(copy.subjects.find((s) => s.id === a.id)?.color).toBe(a.color)
-  })
-  it('avvisar ogiltig färg men tillåter ämnen utan färg', () => {
-    const base = { app: 'studieassistent', version: 3, lessons: [] }
-    expect(() => parseBackup({ ...base, subjects: [{ id: '1', name: 'x', color: 'red', packItems: [] }] })).toThrow(/ämnesfärg/)
-    expect(parseBackup({ ...base, subjects: [{ id: '1', name: 'x', packItems: [] }] }).subjects[0].color).toBeUndefined()
-  })
-})
-
-describe('avbockad packlista', () => {
-  it('sparas per datum, kan avbockas igen och gamla dagar städas bort', async () => {
-    await setPackChecked('2026-11-08', 'bok', true, '2026-11-08')
-    await setPackChecked('2026-11-09', 'dator', true, '2026-11-08')
-    await setPackChecked('2026-11-09', 'bok', true, '2026-11-08')
-    expect((await db.packChecks.get('2026-11-09'))!.checked.sort()).toEqual(['bok', 'dator'])
-    await setPackChecked('2026-11-09', 'bok', false, '2026-11-09') // nästa dag: gårdagens rad rensas
-    expect((await db.packChecks.get('2026-11-09'))!.checked).toEqual(['dator'])
-    expect(await db.packChecks.get('2026-11-08')).toBeUndefined()
-  })
-})
-
-describe('äldre OpenAI-nyckel', () => {
-  it('tas bort från webbläsaren men inställningar i övrigt behålls', async () => {
-    await db.aiConfig.put({ id: 'main', apiKey: 'sk-gammal', model: 'gpt-4.1' } as never)
-    await purgeLegacyApiKey()
-    const row = (await db.aiConfig.get('main')) as unknown as Record<string, unknown>
-    expect(row).not.toHaveProperty('apiKey')
-    expect(row.model).toBe('gpt-4.1')
-    expect(JSON.stringify(row)).not.toContain('sk-gammal')
-  })
-})
-
-describe('importLessons', () => {
-  it('skapar saknade ämnen en gång, återanvänder befintliga och sparar allt eller inget', async () => {
-    const matte = await addSubject('Matte')
-    const draft = (subject: string, start: string) => ({ subject, weekday: 1, start, end: '23:00', room: ' A1 ', teacher: '', weeks: null })
-    const r = await importLessons([draft('matte', '08:00'), draft('Spanska', '09:00'), draft('SPANSKA', '10:00')])
-    expect(r).toEqual({ lessons: 3, newSubjects: 1 })
-    expect(await db.subjects.count()).toBe(2)
-    const lessons = await db.lessons.toArray()
-    expect(lessons.filter((l) => l.subjectId === matte.id)).toHaveLength(1)
-    expect(lessons[0].room).toBe('A1')
-  })
-})
-
-describe('påminnelser i export', () => {
-  it('följer med export/import, och ogiltiga avvisas', async () => {
-    await db.reminders.put({ id: 'r1', title: 'Ta medicin', time: '07:30', repeat: { kind: 'weekdays', days: [1, 3, 5] }, enabled: true, updatedAt: '' })
-    const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    expect(backup.reminders).toHaveLength(1)
-    await db.reminders.clear()
-    await importAll(backup)
-    expect((await db.reminders.get('r1'))?.repeat).toEqual({ kind: 'weekdays', days: [1, 3, 5] })
-    const base = { app: 'studieassistent', version: 5, subjects: [], lessons: [] }
-    expect(() => parseBackup({ ...base, reminders: [{ id: 'x', title: 't', time: '25:00', repeat: { kind: 'daily' } }] })).toThrow(/påminnelse/)
-    expect(() => parseBackup({ ...base, reminders: [{ id: 'x', title: 't', time: '07:00', repeat: { kind: 'weekdays', days: [] } }] })).toThrow(/upprepning/)
-    expect(parseBackup({ ...base, version: 4 }).reminders).toEqual([])
+  it('avvisar filer från andra appar och ogiltiga varor', () => {
+    expect(() => parseBackup({ app: 'studieassistent', version: 8 })).toThrow(/Matplaneraren/)
+    expect(() => parseBackup({ app: 'matplanerare', version: 2 })).toThrow(/version/)
+    expect(() => parseBackup({ app: 'matplanerare', version: 1, pantry: [{ id: 'x', name: '', addedAt: '2026-11-08' }] })).toThrow(/matvara/)
+    expect(parseBackup({ app: 'matplanerare', version: 1 })).toMatchObject({ pantry: [], shopping: [], meals: [], water: [], mealPlan: [], settings: null })
   })
 })
 
@@ -164,24 +46,6 @@ describe('chattordning', () => {
       Date.now = orig
     }
     expect((await db.chat.orderBy('createdAt').toArray()).map((m) => m.content)).toEqual(['1', '2', '3', '4'])
-  })
-})
-
-describe('mat i export', () => {
-  it('lager och inköpslista följer med export/import; ogiltigt avvisas; äldre filer får tomma listor', async () => {
-    await db.pantry.put({ id: 'p1', name: 'Mjölk', amount: '1 l', expires: '2026-11-12', addedAt: '2026-11-08', source: 'receipt', updatedAt: '' })
-    await db.shopping.put({ id: 's1', name: 'Ägg', done: false, addedAt: '2026-11-08', updatedAt: '' })
-    const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    expect(backup.pantry).toHaveLength(1)
-    expect(backup.shopping).toHaveLength(1)
-    await Promise.all([db.pantry.clear(), db.shopping.clear(), db.meals.clear(), db.water.clear()])
-    await importAll(backup)
-    expect((await db.pantry.get('p1'))?.expires).toBe('2026-11-12')
-    expect((await db.shopping.get('s1'))?.name).toBe('Ägg')
-    const base = { app: 'studieassistent', version: 6, subjects: [], lessons: [] }
-    expect(() => parseBackup({ ...base, pantry: [{ id: 'x', name: '', addedAt: '2026-11-08' }] })).toThrow(/matvara/)
-    expect(() => parseBackup({ ...base, shopping: [{ id: 'x' }] })).toThrow(/inköpsvara/)
-    expect(parseBackup({ ...base, version: 5 })).toMatchObject({ pantry: [], shopping: [] })
   })
 })
 
@@ -240,45 +104,5 @@ describe('kost: måltider och vatten', () => {
     expect(await addWater('2026-11-10', -1000)).toBe(0)
     expect(await addWater('2026-11-10', 99_999)).toBe(20_000)
     expect(await db.water.count()).toBe(1)
-  })
-  it('måltider och vatten följer med export/import; ogiltigt avvisas; äldre filer får tomma listor och standardmål', async () => {
-    await Promise.all([db.meals.clear(), db.water.clear()])
-    await saveMeal({ id: 'm1', date: '2026-11-10', time: '12:30', name: 'Kyckling och ris', kcal: 650, protein: 45.5, carbs: 70, fat: 12, source: 'ai', updatedAt: '' })
-    await addWater('2026-11-10', 750)
-    const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    expect(backup.meals).toHaveLength(1)
-    expect(backup.water).toEqual([expect.objectContaining({ id: '2026-11-10', ml: 750 })])
-    await Promise.all([db.meals.clear(), db.water.clear()])
-    await importAll(backup)
-    expect(await db.meals.get('m1')).toMatchObject({ protein: 45.5, kcal: 650, source: 'ai', time: '12:30' })
-    const base = { app: 'studieassistent', version: 7, subjects: [], lessons: [] }
-    expect(() => parseBackup({ ...base, meals: [{ id: 'x', date: '2026-11-10', name: 'Mat', protein: -1, carbs: 1, fat: 1 }] })).toThrow(/näringsvärden/)
-    expect(() => parseBackup({ ...base, meals: [{ id: 'x', date: 'idag', name: 'Mat', protein: 1, carbs: 1, fat: 1 }] })).toThrow(/måltid/)
-    expect(() => parseBackup({ ...base, water: [{ id: 'a', date: '2026-11-10', ml: 100 }] })).toThrow(/vattenrad/)
-    const old = parseBackup({ ...base, version: 6 })
-    expect(old).toMatchObject({ meals: [], water: [] })
-    expect(parseBackup({ ...base, settings: { cycleLength: 1, cycleAnchor: '2026-11-02', theme: 'system' } }).settings?.nutrition).toEqual({ proteinG: 120, carbsG: 250, fatG: 70, waterMl: 2000, glassMl: 250 })
-  })
-})
-
-describe('minne i export', () => {
-  it('följer med export/import och rensas från skräp', async () => {
-    await saveSettings({ memories: ['Gillar inte svamp', 'Tränar helst på morgonen'] })
-    const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    expect(backup.settings?.memories).toEqual(['Gillar inte svamp', 'Tränar helst på morgonen'])
-    const dirty = parseBackup({ app: 'studieassistent', version: 7, subjects: [], lessons: [], settings: { cycleLength: 1, cycleAnchor: '2026-11-02', theme: 'system', memories: [' a ', 3, '', 'b'] } })
-    expect(dirty.settings?.memories).toEqual(['a', 'b'])
-  })
-})
-
-describe('ämnen utan färg', () => {
-  it('får en ledig färg ur paletten, och färgade ämnen rörs inte', async () => {
-    await db.subjects.clear()
-    await db.subjects.bulkPut([{ id: 'a', name: 'Spanska', packItems: [] }, { id: 'b', name: 'Matte', color: '#1a73e8', packItems: [] }])
-    await assignMissingColors()
-    const [a, b] = await Promise.all([db.subjects.get('a'), db.subjects.get('b')])
-    expect(a!.color).toMatch(/^#[0-9a-f]{6}$/i)
-    expect(a!.color).not.toBe('#1a73e8')
-    expect(b!.color).toBe('#1a73e8')
   })
 })

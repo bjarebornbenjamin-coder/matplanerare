@@ -24,7 +24,7 @@ class FakeRemote implements Remote {
 let a: AppDB
 let b: AppDB
 let remote: FakeRemote
-const subj = (id: string, name: string) => ({ id, name, packItems: [] })
+const item = (id: string, name: string) => ({ id, name, addedAt: '2026-11-08', source: 'manual' as const, updatedAt: '' })
 
 beforeEach(async () => {
   a = new AppDB(`a-${Math.random()}`)
@@ -34,55 +34,55 @@ beforeEach(async () => {
 
 describe('synk', () => {
   it('första inloggningen laddar upp befintlig lokal data (migrering)', async () => {
-    await a.subjects.put(subj('s1', 'Matte'))
-    await a.lessons.put({ id: 'l1', subjectId: 's1', weekday: 1, start: '08:00', end: '09:00', room: '', teacher: '', weeks: null })
-    await a.settings.put({ id: 'main', cycleLength: 2, cycleAnchor: '2026-11-02', theme: 'dark', notify: { evening: true, eveningTime: '20:00', before: false, beforeMinutes: 10, morning: false, morningTime: '07:00' }, food: { allergies: '', portions: 2, shopping: { enabled: true, weekday: 5, time: '16:00' }, expiry: { enabled: true, time: '08:00' } }, nutrition: { proteinG: 120, carbsG: 250, fatG: 70, waterMl: 2000, glassMl: 250 }, memories: [] })
+    await a.pantry.put(item('s1', 'Matte'))
+    await a.shopping.put({ id: 'l1', name: 'Ägg', done: false, addedAt: '2026-11-08', updatedAt: '' })
+    await a.settings.put({ id: 'main', theme: 'dark', food: { allergies: '', portions: 2, quickWeekdays: [], trainingWeekdays: [], shopping: { enabled: true, weekday: 5, time: '16:00' }, expiry: { enabled: true, time: '08:00' } }, nutrition: { proteinG: 120, carbsG: 250, fatG: 70, waterMl: 2000, glassMl: 250 }, memories: [] })
     const r = await runSync(a, remote, 'u1')
     expect(r.pushed).toBe(3)
-    expect([...remote.rows.keys()].sort()).toEqual(['lessons:l1', 'settings:main', 'subjects:s1'])
+    expect([...remote.rows.keys()].sort()).toEqual(['pantry:s1', 'settings:main', 'shopping:l1'])
   })
 
   it('ändringar går mellan två enheter åt båda håll, inklusive borttagning', async () => {
-    await a.subjects.put(subj('s1', 'Matte'))
+    await a.pantry.put(item('s1', 'Matte'))
     await runSync(a, remote, 'u1')
     await runSync(b, remote, 'u1')
-    expect((await b.subjects.get('s1'))?.name).toBe('Matte')
+    expect((await b.pantry.get('s1'))?.name).toBe('Matte')
 
-    await b.subjects.put(subj('s1', 'Matematik'))
-    await b.events.put({ id: 'e1', title: 'Prov', date: '2026-11-12', note: '', updatedAt: '' })
+    await b.pantry.put(item('s1', 'Matematik'))
+    await b.shopping.put({ id: 'e1', name: 'Prov', done: false, addedAt: '2026-11-08', updatedAt: '' })
     await runSync(b, remote, 'u1')
     await runSync(a, remote, 'u1')
-    expect((await a.subjects.get('s1'))?.name).toBe('Matematik')
-    expect((await a.events.get('e1'))?.title).toBe('Prov')
+    expect((await a.pantry.get('s1'))?.name).toBe('Matematik')
+    expect((await a.shopping.get('e1'))?.name).toBe('Prov')
 
-    await a.events.delete('e1')
+    await a.shopping.delete('e1')
     await runSync(a, remote, 'u1')
     await runSync(b, remote, 'u1')
-    expect(await b.events.get('e1')).toBeUndefined()
+    expect(await b.shopping.get('e1')).toBeUndefined()
   })
 
   it('en andra synk utan ändringar skickar och tillämpar ingenting', async () => {
-    await a.subjects.put(subj('s1', 'Matte'))
+    await a.pantry.put(item('s1', 'Matte'))
     await runSync(a, remote, 'u1')
     const again = await runSync(a, remote, 'u1')
     expect(again).toMatchObject({ pushed: 0, applied: 0 })
   })
 
   it('lokal osynkad ändring skrivs inte över av inkommande, utan vinner', async () => {
-    await a.subjects.put(subj('s1', 'Matte'))
+    await a.pantry.put(item('s1', 'Matte'))
     await runSync(a, remote, 'u1')
     await runSync(b, remote, 'u1')
-    await a.subjects.put(subj('s1', 'Från A'))
+    await a.pantry.put(item('s1', 'Från A'))
     await runSync(a, remote, 'u1')
-    await b.subjects.put(subj('s1', 'Lokalt på B')) // B har inte hunnit synka A:s ändring
+    await b.pantry.put(item('s1', 'Lokalt på B')) // B har inte hunnit synka A:s ändring
     await runSync(b, remote, 'u1')
-    expect((await b.subjects.get('s1'))?.name).toBe('Lokalt på B')
+    expect((await b.pantry.get('s1'))?.name).toBe('Lokalt på B')
     await runSync(a, remote, 'u1')
-    expect((await a.subjects.get('s1'))?.name).toBe('Lokalt på B') // senast synkade skrivningen gäller
+    expect((await a.pantry.get('s1'))?.name).toBe('Lokalt på B') // senast synkade skrivningen gäller
   })
 
   it('misslyckad uppladdning förlorar inget och försöks igen', async () => {
-    await a.subjects.put(subj('s1', 'Matte'))
+    await a.pantry.put(item('s1', 'Matte'))
     remote.failNextPush = true
     await expect(runSync(a, remote, 'u1')).rejects.toThrow('offline')
     expect(remote.rows.size).toBe(0)
@@ -91,18 +91,18 @@ describe('synk', () => {
   })
 
   it('byte av konto laddar upp enhetens data till det nya kontot', async () => {
-    await a.subjects.put(subj('s1', 'Matte'))
+    await a.pantry.put(item('s1', 'Matte'))
     await runSync(a, remote, 'u1')
     const other = new FakeRemote()
     expect((await runSync(a, other, 'u2')).pushed).toBe(1)
   })
 
   it('ignorerar felaktiga poster från servern', async () => {
-    remote.rows.set('subjects:x', { collection: 'subjects', id: 'x', data: { id: 'annat', name: 'Fel' }, deleted: false, updated_at: '2026-11-08T12:00:01.000000+00:00' })
+    remote.rows.set('pantry:x', { collection: 'pantry', id: 'x', data: { id: 'annat', name: 'Fel' }, deleted: false, updated_at: '2026-11-08T12:00:01.000000+00:00' })
     remote.rows.set('okänd:y', { collection: 'okänd', id: 'y', data: { id: 'y' }, deleted: false, updated_at: '2026-11-08T12:00:02.000000+00:00' })
     const r = await runSync(a, remote, 'u1')
     expect(r.applied).toBe(0)
-    expect(await a.subjects.count()).toBe(0)
+    expect(await a.pantry.count()).toBe(0)
   })
 
   it('hash är oberoende av nyckelordning', () => {

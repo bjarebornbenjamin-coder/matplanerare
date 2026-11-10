@@ -1,33 +1,22 @@
-import { eventsOn } from '../domain/calendar'
 import { WEEKDAYS_LONG, addDays, weekdayOf } from '../domain/dates'
 import { daysLeft, foodKey } from '../domain/food'
-import { lessonsOn } from '../domain/schedule'
-import { workoutTypeOf } from '../domain/training'
-import type { CalendarEvent, FoodSettings, ISODate, Lesson, NutritionSettings, PantryItem, PlannedDinner, Settings } from '../domain/types'
+import type { FoodSettings, ISODate, NutritionSettings, PantryItem, PlannedDinner } from '../domain/types'
 import { ChatError, describeError } from './chat'
 import { parseQty, withPantryStatus } from './recipes'
 
 export interface DayContext {
   date: ISODate
   weekday: string
-  /** När sista lektionen slutar, om det är skoldag. */
-  schoolEnds?: string
-  /** Händelser på eftermiddag/kväll (från 16:00), med tid. */
-  evening: string[]
-  training: boolean
   /** Kort om tid: middagen bör ta högst 30 minuter. */
   quick: boolean
+  /** Träningsdag: proteinrik middag. */
+  training: boolean
 }
 
-/** Hur dagen ser ut, så att menyn kan ha snabba rätter på fulla dagar och mer protein på träningsdagar. */
-export function dayContext(date: ISODate, lessons: Lesson[], events: CalendarEvent[], settings: Pick<Settings, 'cycleLength' | 'cycleAnchor'>): DayContext {
-  const ls = lessonsOn(date, lessons, settings)
-  const schoolEnds = ls.length ? ls.reduce((m, l) => (l.end > m ? l.end : m), '00:00') : undefined
-  const evs = eventsOn(date, events)
-  const evening = evs.filter((e) => e.start && e.start >= '16:00').map((e) => `${e.title} ${e.start}${e.end ? `–${e.end}` : ''}`)
-  const training = evs.some((e) => workoutTypeOf(e.title))
-  const busyEvening = evs.some((e) => e.start && e.start >= '16:30' && e.start <= '20:00')
-  return { date, weekday: WEEKDAYS_LONG[weekdayOf(date) - 1], ...(schoolEnds ? { schoolEnds } : {}), evening, training, quick: busyEvening || (schoolEnds ?? '') >= '16:30' }
+/** Hur dagen ser ut enligt användarens val av veckodagar med ont om tid och träning. */
+export function dayContext(date: ISODate, food: Pick<FoodSettings, 'quickWeekdays' | 'trainingWeekdays'>): DayContext {
+  const wd = weekdayOf(date)
+  return { date, weekday: WEEKDAYS_LONG[wd - 1], quick: food.quickWeekdays.includes(wd), training: food.trainingWeekdays.includes(wd) }
 }
 
 export const MEAL_PLAN_PROMPT = [

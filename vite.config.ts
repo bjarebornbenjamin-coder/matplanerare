@@ -9,8 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Studieassistent',
-        short_name: 'Studie',
+        name: 'Matplaneraren',
+        short_name: 'Matplaneraren',
+        description: 'Planera veckans mat, håll koll på matlagret och handla smart.',
         lang: 'sv',
         start_url: '/',
         display: 'standalone',

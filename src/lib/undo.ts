@@ -39,7 +39,7 @@ export function useToast(): Toast | null {
   )
 }
 
-type TableName = 'lessons' | 'subjects' | 'events' | 'tasks' | 'reminders' | 'pantry' | 'shopping' | 'meals' | 'workouts' | 'mealPlan'
+type TableName = 'pantry' | 'shopping' | 'meals' | 'mealPlan'
 
 /**
  * Kör en ändring och visar en ruta med "Ångra". Ångra återställer de berörda tabellerna

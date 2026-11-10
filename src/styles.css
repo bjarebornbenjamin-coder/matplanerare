@@ -608,3 +608,8 @@ button.tl-row:hover { background: var(--surface-3, var(--surface)); }
 .c-main { display: flex; flex-direction: column; min-width: 0; }
 .c-main .title { font-size: 15px; }
 .c-main .sub { font-size: 13px; color: var(--muted); }
+fieldset.weekday-picker { border: 0; padding: 0; margin: 0 0 12px; }
+fieldset.weekday-picker legend { font-size: 13px; color: var(--muted); margin-bottom: 6px; padding: 0; }
+.weekday-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.weekday-row .chip { padding: 8px 0; min-height: 40px; justify-content: center; }
+.weekday-row .chip[aria-pressed='true'] { background: var(--primary-container); color: var(--on-primary-container); border-color: transparent; }

@@ -3,22 +3,14 @@ export type HHmm = string // "HH:mm", lokal tid
 
 export type Theme = 'system' | 'light' | 'dark'
 
-export interface NotifySettings {
-  /** Kvällsnotis om morgondagens lektioner och vad du ska ta med. */
-  evening: boolean
-  eveningTime: HHmm
-  /** Notis en stund före varje lektion. */
-  before: boolean
-  beforeMinutes: number
-  /** Morgonöversikt: dagens lektioner, packlista, deadlines, händelser och mat som går ut. */
-  morning: boolean
-  morningTime: HHmm
-}
-
 export interface FoodSettings {
-  /** Allergier och kostönskemål i fri text, skickas med när recept föreslås. */
+  /** Allergier och kostönskemål i fri text, skickas med när recept och menyer tas fram. */
   allergies: string
   portions: number
+  /** Veckodagar med ont om tid (1 = måndag … 7 = söndag): då föreslås snabba middagar. */
+  quickWeekdays: number[]
+  /** Veckodagar när man tränar: då föreslås proteinrika middagar. */
+  trainingWeekdays: number[]
   /** Notis med inköpslistan en viss veckodag (1 = måndag … 7 = söndag). */
   shopping: { enabled: boolean; weekday: number; time: HHmm }
   /** Notis när mat snart går ut. */
@@ -36,74 +28,11 @@ export interface NutritionSettings {
 
 export interface Settings {
   id: 'main'
-  /** Antal veckor i cykeln: 1 = samma varje vecka, 2 = A/B, osv. */
-  cycleLength: number
-  /** En måndag som tillhör vecka 0 (A) i cykeln. */
-  cycleAnchor: ISODate
   theme: Theme
-  notify: NotifySettings
   food: FoodSettings
   nutrition: NutritionSettings
   /** Saker användaren bett assistenten komma ihåg (preferenser). */
   memories: string[]
-}
-
-export interface PackItem {
-  id: string
-  text: string
-}
-
-export interface Subject {
-  id: string
-  name: string
-  /** Hex-färg, t.ex. #1a73e8. Saknas för äldre ämnen. */
-  color?: string
-  packItems: PackItem[]
-}
-
-export interface Lesson {
-  id: string
-  subjectId: string
-  /** 1 = måndag … 7 = söndag */
-  weekday: number
-  start: HHmm
-  end: HHmm
-  room: string
-  teacher: string
-  /** Index i veckocykeln som lektionen gäller; null = varje vecka. */
-  weeks: number[] | null
-}
-
-export interface CalendarEvent {
-  id: string
-  title: string
-  date: ISODate
-  /** Utan starttid är händelsen heldag. */
-  start?: HHmm
-  end?: HHmm
-  note: string
-  /** Saker att ta med till händelsen. */
-  packItems?: string[]
-  /** Hämtad från Google Kalender: skrivskyddad i appen, ändras i Google. */
-  source?: 'google'
-  /** Länk till händelsen i Google Kalender. */
-  link?: string
-  updatedAt: string
-}
-
-export type ReminderRepeat =
-  | { kind: 'once'; date: ISODate }
-  | { kind: 'daily' }
-  /** Valda veckodagar, 1 = måndag … 7 = söndag. En enda dag = varje vecka. */
-  | { kind: 'weekdays'; days: number[] }
-
-export interface Reminder {
-  id: string
-  title: string
-  time: HHmm
-  repeat: ReminderRepeat
-  enabled: boolean
-  updatedAt: string
 }
 
 export interface PantryItem {
@@ -150,27 +79,6 @@ export interface WaterDay {
   updatedAt: string
 }
 
-export interface WorkoutExercise {
-  name: string
-  sets: number
-  reps: number
-  weightKg?: number
-}
-
-/** Ett genomfört träningspass. */
-export interface Workout {
-  id: string
-  date: ISODate
-  /** "gym", "löpning" eller annat (fri text). */
-  type: string
-  title: string
-  minutes?: number
-  distanceKm?: number
-  exercises: WorkoutExercise[]
-  note: string
-  updatedAt: string
-}
-
 /** En middag i veckomenyn. id = datum, så en middag per dag. */
 export interface PlannedDinner {
   id: ISODate
@@ -190,30 +98,6 @@ export interface PlannedDinner {
   updatedAt: string
 }
 
-export interface Task {
-  id: string
-  title: string
-  subjectId?: string
-  deadline: ISODate
-  /** Klockslag då uppgiften ska vara inne, t.ex. 23:59. */
-  time?: HHmm
-  note?: string
-  done: boolean
-  updatedAt: string
-}
-
-/** Avbockade packsaker för en viss dag (nycklar enligt itemKey). Sparas inte i export. */
-export interface PackChecks {
-  date: ISODate
-  checked: string[]
-}
-
-export interface Contact {
-  id: string
-  name: string
-  email: string
-}
-
 /** Sparas bara lokalt och ingår aldrig i export. OpenAI-nyckeln finns bara på servern. */
 export interface AiConfig {
   id: 'main'
@@ -225,32 +109,16 @@ export interface AiConfig {
 }
 
 export type ChatCard =
-  | { type: 'event'; event: Omit<CalendarEvent, 'id' | 'updatedAt'> }
-  | { type: 'reminder_add'; reminder: Omit<Reminder, 'id' | 'updatedAt' | 'enabled'> }
-  | { type: 'reminder_delete'; id: string; summary: string }
-  | { type: 'task_update'; id: string; before: string; after: Pick<Task, 'title' | 'deadline' | 'done' | 'time' | 'note'> }
-  | { type: 'task_delete'; id: string; summary: string }
-  | { type: 'lesson_add'; subject: string; lesson: Pick<Lesson, 'weekday' | 'start' | 'end' | 'room' | 'teacher' | 'weeks'> }
-  | { type: 'pack_update'; subjectId: string; subjectName: string; add: string[]; remove: string[] }
   | { type: 'shopping_update'; boughtIds: string[]; removeIds: string[]; bought: string[]; removed: string[] }
   | { type: 'pantry_update'; id: string; before: string; after: Pick<PantryItem, 'name'> & Partial<Pick<PantryItem, 'amount' | 'expires'>> }
-  | { type: 'contact_add'; contact: Omit<Contact, 'id'> }
   | { type: 'prefs_update'; food: Partial<Pick<FoodSettings, 'allergies' | 'portions'>>; nutrition: Partial<NutritionSettings>; summary: string[] }
   | { type: 'memory_add'; fact: string }
   | { type: 'memory_delete'; fact: string }
-  | { type: 'events_add'; events: Omit<CalendarEvent, 'id' | 'updatedAt'>[] }
-  | { type: 'task'; task: Pick<Task, 'title' | 'subjectId' | 'deadline' | 'time' | 'note'> }
-  | { type: 'event_update'; id: string; before: string; afterText: string; after: Omit<CalendarEvent, 'id' | 'updatedAt'> }
   | { type: 'meal_add'; meal: Pick<Meal, 'date' | 'name' | 'protein' | 'carbs' | 'fat'> & Partial<Pick<Meal, 'time' | 'kcal'>> }
   | { type: 'water_add'; date: ISODate; ml: number }
   | { type: 'shopping_add'; items: { name: string; amount?: string }[] }
   | { type: 'pantry_add'; items: { name: string; amount?: string; expires?: ISODate }[] }
   | { type: 'pantry_remove'; ids: string[]; names: string[] }
-  | { type: 'event_delete'; id: string; summary: string }
-  | { type: 'lesson_update'; id: string; before: string; afterText: string; after: Pick<Lesson, 'weekday' | 'start' | 'end' | 'room' | 'teacher'> }
-  | { type: 'lesson_delete'; id: string; summary: string }
-  | { type: 'workout_add'; workout: Omit<Workout, 'id' | 'updatedAt'> }
-  | { type: 'email'; to: string; toName?: string; subject: string; body: string }
 
 export interface ChatMessage {
   id: string
@@ -263,20 +131,13 @@ export interface ChatMessage {
 }
 
 export interface Backup {
-  app: 'studieassistent'
-  version: 8
+  app: 'matplanerare'
+  version: 1
   exportedAt: string
   settings: Settings | null
-  subjects: Subject[]
-  lessons: Lesson[]
-  events: CalendarEvent[]
-  contacts: Contact[]
-  tasks: Task[]
-  reminders: Reminder[]
   pantry: PantryItem[]
   shopping: ShoppingItem[]
   meals: Meal[]
   water: WaterDay[]
-  workouts: Workout[]
   mealPlan: PlannedDinner[]
 }

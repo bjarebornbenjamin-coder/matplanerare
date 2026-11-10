@@ -1,29 +1,15 @@
-import { dayLabel, eventTime, eventsOn } from '../domain/calendar'
-import { WEEKDAYS_LONG, addDays, daysBetween, weekdayOf } from '../domain/dates'
-import { allPackItems, eventPackingFor, packingFor } from '../domain/packing'
-import { lessonsOn } from '../domain/schedule'
+import { addDays, daysBetween, toISODate } from '../domain/dates'
 import { daysLeft, foodKey } from '../domain/food'
-import { MORE_TOOL_DEFINITIONS, runMoreTool } from './toolsMore'
-import { TRAINING_RULES, planWorkouts } from '../domain/training'
 import { goalKcal, lastDays, mealKcal, mealsOn } from '../domain/nutrition'
-import { occursOn } from '../domain/reminders'
-import { tasksOn } from '../domain/tasks'
-import { toISODate } from '../domain/dates'
-import type { PlannedDinner, Workout, CalendarEvent, ChatCard, Contact, Lesson, Meal, PantryItem, Reminder, Settings, ShoppingItem, Subject, Task, WaterDay } from '../domain/types'
+import type { ChatCard, Meal, PantryItem, PlannedDinner, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
+/** Det chatten kan läsa. */
 export interface ToolContext {
   settings: Settings
-  lessons: Lesson[]
-  subjects: Subject[]
-  events: CalendarEvent[]
-  contacts: Contact[]
-  tasks: Task[]
   pantry: PantryItem[]
   shopping: ShoppingItem[]
-  reminders: Reminder[]
   meals: Meal[]
   water: WaterDay[]
-  workouts: Workout[]
   mealPlan: PlannedDinner[]
   /** Dagens datum (sätts av chatten så att svaren följer appens klocka). */
   today?: string
@@ -40,258 +26,27 @@ export interface ToolOutcome {
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 const date = { type: 'string', description: 'Datum som YYYY-MM-DD' }
-
-const BASE_TOOL_DEFINITIONS = [
-  {
-    name: 'get_schedule',
-    description: 'Hämta BARA användarens lektioner (ämne, tid, sal, lärare) för ett visst datum. För frågor om vad användaren har en dag eller vecka: använd get_overview i stället, som även innehåller uppgifter, händelser och påminnelser.',
-    parameters: { type: 'object', properties: { date }, required: ['date'] },
-  },
-  {
-    name: 'get_overview',
-    description:
-      'Helhetsbild för en dag eller ett datumintervall: lektioner, kalenderhändelser, uppgifter med deadline, påminnelser och packlista per dag, samt försenade uppgifter. Använd ALLTID denna för frågor som "vad har jag imorgon/idag/i veckan". Max 14 dagar.',
-    parameters: { type: 'object', properties: { from: date, to: { ...date, description: 'Sista datum, samma som from för en enda dag' } }, required: ['from'] },
-  },
-  {
-    name: 'get_packing_list',
-    description: 'Hämta vad användaren ska ta med till skolan ett visst datum, utifrån dagens lektioner.',
-    parameters: { type: 'object', properties: { date }, required: ['date'] },
-  },
-  {
-    name: 'list_events',
-    description: 'Lista kalenderhändelser (prov, inlämningar, aktiviteter) från och med ett datum till och med ett annat. Max 62 dagar.',
-    parameters: { type: 'object', properties: { from: date, to: date }, required: ['from', 'to'] },
-  },
-  {
-    name: 'list_tasks',
-    description: 'Lista läxor/uppgifter med deadline från och med ett datum till och med ett annat (och försenade ej klara om include_overdue är true).',
-    parameters: {
-      type: 'object',
-      properties: {
-        from: date,
-        to: date,
-        include_done: { type: 'boolean', description: 'Ta med redan klara uppgifter (standard false)' },
-        include_overdue: { type: 'boolean', description: 'Ta med försenade ej klara uppgifter före from (standard true)' },
-      },
-      required: ['from', 'to'],
-    },
-  },
-  {
-    name: 'find_contact',
-    description: 'Slå upp kontakter på namn (delsträng räcker). Returnerar namn och e-postadress.',
-    parameters: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
-  },
-  {
-    name: 'propose_event',
-    description:
-      'Föreslå en ny kalenderhändelse. Den läggs INTE in förrän användaren bekräftat i appen. Utelämna start för heldag.',
-    parameters: {
-      type: 'object',
-      properties: {
-        title: { type: 'string' },
-        date,
-        start: { type: 'string', description: 'HH:mm, utelämna för heldag' },
-        end: { type: 'string', description: 'HH:mm, kräver start' },
-        note: { type: 'string' },
-        pack: { type: 'array', items: { type: 'string' }, description: 'Saker att ta med till händelsen, korta namn (valfritt)' },
-      },
-      required: ['title', 'date'],
-    },
-  },
-  {
-    name: 'propose_task',
-    description: 'Föreslå en ny läxa/uppgift med deadline. Den läggs INTE in förrän användaren bekräftat i appen. "subject" är ämnets namn (valfritt).',
-    parameters: {
-      type: 'object',
-      properties: { title: { type: 'string' }, deadline: date, time: { type: 'string', description: 'Klockslag HH:mm då den ska vara inne, valfritt' }, note: { type: 'string', description: 'Anteckning, valfritt' }, subject: { type: 'string' } },
-      required: ['title', 'deadline'],
-    },
-  },
-  {
-    name: 'propose_update_event',
-    description:
-      'Föreslå ändring av en befintlig händelse (id från list_events). Ange bara fält som ska ändras. start="" gör den till heldag. Ändras INTE förrän användaren bekräftat.',
-    parameters: {
-      type: 'object',
-      properties: { id: { type: 'string' }, title: { type: 'string' }, date, start: { type: 'string' }, end: { type: 'string' }, note: { type: 'string' } },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'propose_delete_event',
-    description: 'Föreslå borttagning av en händelse (id från list_events). Tas INTE bort förrän användaren bekräftat.',
-    parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-  },
-  {
-    name: 'propose_update_lesson',
-    description:
-      'Föreslå ändring av en lektion i schemat (id från get_schedule). Ange bara fält som ska ändras. weekday är 1=måndag … 7=söndag. Ändras INTE förrän användaren bekräftat.',
-    parameters: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        weekday: { type: 'integer' },
-        start: { type: 'string', description: 'HH:mm' },
-        end: { type: 'string', description: 'HH:mm' },
-        room: { type: 'string' },
-        teacher: { type: 'string' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'propose_delete_lesson',
-    description: 'Föreslå borttagning av en lektion ur schemat (id från get_schedule). Tas INTE bort förrän användaren bekräftat.',
-    parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-  },
-  {
-    name: 'list_pantry',
-    description: 'Lista vad användaren har hemma i matlagret, med mängd, bäst före-datum och daysLeft (negativt = utgånget). Använd den för matfrågor.',
-    parameters: { type: 'object', properties: {} },
-  },
-  {
-    name: 'list_shopping',
-    description: 'Lista användarens inköpslista (done = redan köpt).',
-    parameters: { type: 'object', properties: {} },
-  },
-  {
-    name: 'propose_shopping_items',
-    description: 'Föreslå varor att lägga på inköpslistan. De läggs INTE dit förrän användaren bekräftat i appen. Varor som redan står på listan hoppas över.',
-    parameters: {
-      type: 'object',
-      properties: { items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, amount: { type: 'string' } }, required: ['name'] } } },
-      required: ['items'],
-    },
-  },
-  {
-    name: 'propose_pantry_add',
-    description: 'Föreslå varor att lägga i matlagret (t.ex. efter inköp). Läggs INTE dit förrän användaren bekräftat. expires är bäst före-datum YYYY-MM-DD, valfritt.',
-    parameters: {
-      type: 'object',
-      properties: { items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, amount: { type: 'string' }, expires: date }, required: ['name'] } } },
-      required: ['items'],
-    },
-  },
-  {
-    name: 'propose_pantry_remove',
-    description: 'Föreslå att varor tas bort ur matlagret (uppätna eller slut), angivna med namn som i list_pantry. Tas INTE bort förrän användaren bekräftat.',
-    parameters: { type: 'object', properties: { names: { type: 'array', items: { type: 'string' } } }, required: ['names'] },
-  },
-  {
-    name: 'get_nutrition',
-    description:
-      'Hämta loggade måltider (med protein, kolhydrater, fett, kcal), vatten och användarens mål för ett datumintervall (max 14 dagar), med dagssummor. Använd för frågor om hur mycket användaren ätit eller druckit och vad som återstår mot målen.',
-    parameters: { type: 'object', properties: { from: date, to: { ...date, description: 'Sista datum, samma som from för en dag' } }, required: ['from'] },
-  },
-  {
-    name: 'propose_meal',
-    description:
-      'Föreslå att logga en måltid användaren berättat att hen ätit, med din UPPSKATTNING av näringsvärden (hela måltiden, protein/kolhydrater/fett i gram, kcal valfritt). Loggas INTE förrän användaren bekräftat i appen. date är YYYY-MM-DD (standard idag).',
-    parameters: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        date,
-        time: { type: 'string', description: 'HH:mm, valfritt' },
-        protein: { type: 'number' },
-        carbs: { type: 'number' },
-        fat: { type: 'number' },
-        kcal: { type: 'number' },
-      },
-      required: ['name', 'protein', 'carbs', 'fat'],
-    },
-  },
-  {
-    name: 'propose_water',
-    description: 'Föreslå att lägga till vatten användaren druckit (ml). Läggs INTE till förrän användaren bekräftat. Ett glas är glassMl från användarens inställningar.',
-    parameters: { type: 'object', properties: { ml: { type: 'number' }, date }, required: ['ml'] },
-  },
-  {
-    name: 'plan_workouts',
-    description:
-      'Planera träningspass (gym, löpning, m.m.) på de dagar som passar bäst. Följer träningsregler: aldrig 3 dagar i rad, högst ett pass per dag (olika pass olika dagar), vila mellan lika pass, jämn spridning, efter skolan, och hänsyn till lektioner, händelser, prov och redan inlagda träningspass. Använd ALLTID denna för frågor om när man ska träna. Planera aldrig träningsdagar själv.',
-    parameters: {
-      type: 'object',
-      properties: {
-        sessions: {
-          type: 'array',
-          description: 'Önskade pass, t.ex. [{"type":"gym","count":3},{"type":"löpning","count":2}]',
-          items: { type: 'object', properties: { type: { type: 'string' }, count: { type: 'integer' }, minutes: { type: 'integer', description: 'Längd per pass, valfritt' } }, required: ['type', 'count'] },
-        },
-        from: { ...date, description: 'Första dag att planera från (standard i morgon)' },
-        days: { type: 'integer', description: 'Antal dagar att planera över, 3–14 (standard 7)' },
-        avoid_weekdays: { type: 'array', items: { type: 'integer' }, description: 'Veckodagar att undvika, 1=måndag … 7=söndag' },
-        preferred_time: { type: 'string', enum: ['morning', 'afternoon', 'evening'] },
-      },
-      required: ['sessions'],
-    },
-  },
-  {
-    name: 'propose_events',
-    description:
-      'Föreslå flera kalenderhändelser på en gång (t.ex. träningspass från plan_workouts). De läggs INTE in förrän användaren bekräftat. Max 14. Utelämna start för heldag.',
-    parameters: {
-      type: 'object',
-      properties: {
-        events: {
-          type: 'array',
-          items: { type: 'object', properties: { title: { type: 'string' }, date, start: { type: 'string' }, end: { type: 'string' }, note: { type: 'string' }, pack: { type: 'array', items: { type: 'string' } } }, required: ['title', 'date'] },
-        },
-      },
-      required: ['events'],
-    },
-  },
-  {
-    name: 'draft_email',
-    description:
-      'Skriv ett mejlutkast. Mejlet SKICKAS INTE av dig; användaren granskar utkastet och öppnar det i sitt mejlprogram. "to" är en kontakts namn eller en e-postadress.',
-    parameters: {
-      type: 'object',
-      properties: { to: { type: 'string' }, subject: { type: 'string' }, body: { type: 'string' } },
-      required: ['to', 'subject', 'body'],
-    },
-  },
-].map((f) => ({ type: 'function' as const, function: f as { name: string; description: string; parameters: unknown } }))
-
-export const TOOL_DEFINITIONS = [...BASE_TOOL_DEFINITIONS, ...MORE_TOOL_DEFINITIONS]
-
 type Args = Record<string, unknown>
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 const err = (message: string): ToolOutcome => ({ result: { error: message } })
-/** Packsaker från modellen: korta, unika, högst 12. */
-const packOf = (v: unknown): { packItems?: string[] } => {
-  const list: string[] = []
-  for (const x of Array.isArray(v) ? v : []) {
-    const t = typeof x === 'string' ? x.trim().slice(0, 40) : ''
-    if (t && !list.some((y) => y.toLowerCase() === t.toLowerCase())) list.push(t)
-  }
-  return list.length ? { packItems: list.slice(0, 12) } : {}
-}
+const strings = (v: unknown, max = 30): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim().slice(0, 60)).slice(0, max) : []
+const proposed = (card: ChatCard, message = 'Förslaget visas för användaren. Inget är ändrat än.'): ToolOutcome => ({
+  result: { status: 'awaiting_user_confirmation', message },
+  card,
+})
+const short = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })
 
-function lessonView(l: Lesson, subjects: Subject[]) {
-  return {
-    id: l.id,
-    subject: subjects.find((s) => s.id === l.subjectId)?.name ?? 'Okänt ämne',
-    start: l.start,
-    end: l.end,
-    room: l.room || undefined,
-    teacher: l.teacher || undefined,
-  }
-}
-
-export function findContacts(name: string, contacts: Contact[]): Contact[] {
-  const q = name.toLowerCase()
-  const exact = contacts.filter((c) => c.name.toLowerCase() === q)
-  return exact.length > 0 ? exact : contacts.filter((c) => c.name.toLowerCase().includes(q))
-}
-
-const describeEvent = (e: Pick<CalendarEvent, 'title' | 'date' | 'start' | 'end'>) =>
-  `${e.title}, ${dayLabel(e.date)}, ${eventTime(e).toLowerCase()}`
-
-function describeLesson(l: Pick<Lesson, 'weekday' | 'start' | 'end' | 'room' | 'teacher'> & { subjectId?: string }, subjects: Subject[]) {
-  const name = subjects.find((s) => s.id === l.subjectId)?.name
-  return [name, `${WEEKDAYS_LONG[l.weekday - 1]} ${l.start}–${l.end}`, l.room && `sal ${l.room}`, l.teacher].filter(Boolean).join(', ')
+/** Hitta en post på namn: exakt först, annars delsträng. Flera träffar = fråga användaren. */
+function findByName<T>(items: T[], name: string, get: (t: T) => string): { hit?: T; error?: string } {
+  const q = foodKey(name)
+  if (!q) return { error: 'Inget namn angavs.' }
+  const exact = items.filter((i) => foodKey(get(i)) === q)
+  if (exact.length === 1) return { hit: exact[0] }
+  const partial = exact.length ? exact : items.filter((i) => foodKey(get(i)).includes(q))
+  if (partial.length === 1) return { hit: partial[0] }
+  if (partial.length === 0) return { error: `Hittar inget som heter "${name}".` }
+  return { error: `Flera träffar för "${name}": ${partial.slice(0, 6).map(get).join(', ')}. Fråga användaren vilken.` }
 }
 
 /** Rensar en lista med varor från modellen. */
@@ -313,202 +68,115 @@ function cleanItems(v: unknown, withExpiry = false): { list: { name: string; amo
   return list.length > 0 ? { list } : { error: 'Inga giltiga varor angavs.' }
 }
 
-export function findSubject(name: string, subjects: Subject[]): Subject | undefined {
-  const q = name.trim().toLowerCase()
-  return subjects.find((s) => s.name.toLowerCase() === q) ?? subjects.find((s) => s.name.toLowerCase().includes(q))
-}
+export const TOOL_DEFINITIONS = [
+{
+    name: 'list_pantry',
+    description: 'Lista vad användaren har hemma i matlagret, med mängd, bäst före-datum och daysLeft (negativt = utgånget). Använd den för matfrågor.',
+    parameters: { type: 'object', properties: {} },
+  },
+{
+    name: 'list_shopping',
+    description: 'Lista användarens inköpslista (done = redan köpt).',
+    parameters: { type: 'object', properties: {} },
+  },
+{
+    name: 'propose_shopping_items',
+    description: 'Föreslå varor att lägga på inköpslistan. De läggs INTE dit förrän användaren bekräftat i appen. Varor som redan står på listan hoppas över.',
+    parameters: {
+      type: 'object',
+      properties: { items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, amount: { type: 'string' } }, required: ['name'] } } },
+      required: ['items'],
+    },
+  },
+{
+    name: 'propose_pantry_add',
+    description: 'Föreslå varor att lägga i matlagret (t.ex. efter inköp). Läggs INTE dit förrän användaren bekräftat. expires är bäst före-datum YYYY-MM-DD, valfritt.',
+    parameters: {
+      type: 'object',
+      properties: { items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, amount: { type: 'string' }, expires: date }, required: ['name'] } } },
+      required: ['items'],
+    },
+  },
+{
+    name: 'propose_pantry_remove',
+    description: 'Föreslå att varor tas bort ur matlagret (uppätna eller slut), angivna med namn som i list_pantry. Tas INTE bort förrän användaren bekräftat.',
+    parameters: { type: 'object', properties: { names: { type: 'array', items: { type: 'string' } } }, required: ['names'] },
+  },
+{
+    name: 'get_nutrition',
+    description:
+      'Hämta loggade måltider (med protein, kolhydrater, fett, kcal), vatten och användarens mål för ett datumintervall (max 14 dagar), med dagssummor. Använd för frågor om hur mycket användaren ätit eller druckit och vad som återstår mot målen.',
+    parameters: { type: 'object', properties: { from: date, to: { ...date, description: 'Sista datum, samma som from för en dag' } }, required: ['from'] },
+  },
+{
+    name: 'propose_meal',
+    description:
+      'Föreslå att logga en måltid användaren berättat att hen ätit, med din UPPSKATTNING av näringsvärden (hela måltiden, protein/kolhydrater/fett i gram, kcal valfritt). Loggas INTE förrän användaren bekräftat i appen. date är YYYY-MM-DD (standard idag).',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        date,
+        time: { type: 'string', description: 'HH:mm, valfritt' },
+        protein: { type: 'number' },
+        carbs: { type: 'number' },
+        fat: { type: 'number' },
+        kcal: { type: 'number' },
+      },
+      required: ['name', 'protein', 'carbs', 'fat'],
+    },
+  },
+{
+    name: 'propose_water',
+    description: 'Föreslå att lägga till vatten användaren druckit (ml). Läggs INTE till förrän användaren bekräftat. Ett glas är glassMl från användarens inställningar.',
+    parameters: { type: 'object', properties: { ml: { type: 'number' }, date }, required: ['ml'] },
+  },
+{
+    name: 'find_recipes',
+    description: 'Söker upp 1–3 riktiga recept på svenska receptsajter (ICA, Köket, Arla m.fl.) och läser ingredienserna från receptsidan. Ger titel, url, vad som finns hemma och vad som saknas. Använd för ALLA receptförslag; skriv aldrig egna recept.',
+    parameters: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['pantry', 'some', 'any'], description: 'pantry = bara det som finns hemma, some = handla lite, any = handla det som behövs' },
+        wish: { type: 'string', description: 'Önskemål, t.ex. "snabbt", "kyckling", "lätt kvällsmål"' },
+        dish: { type: 'string', description: 'En bestämd rätt att hitta recept på, valfritt' },
+      },
+      required: ['mode'],
+    },
+  },
+{
+    name: 'get_meal_plan',
+    description: 'Veckomenyn: planerade middagar från och med ett datum (standard idag), med ingredienser, steg och näring per portion. Användaren gör menyn under Mat → Meny.',
+    parameters: { type: 'object', properties: { from: date, days: { type: 'integer', description: '1–14, standard 7' } } },
+  },
+{
+    name: 'propose_shopping_update',
+    description: 'Föreslå att markera varor på inköpslistan som köpta och/eller ta bort varor från listan (namn som i list_shopping).',
+    parameters: { type: 'object', properties: { mark_bought: { type: 'array', items: { type: 'string' } }, remove: { type: 'array', items: { type: 'string' } } } },
+  },
+{
+    name: 'propose_pantry_update',
+    description: 'Föreslå ändring av en vara i matlagret (namn som i list_pantry): ny mängd och/eller nytt bäst före-datum ("" tar bort datumet).',
+    parameters: { type: 'object', properties: { name: { type: 'string' }, amount: { type: 'string' }, expires: { type: 'string' } }, required: ['name'] },
+  },
+{
+    name: 'propose_preferences',
+    description: 'Föreslå ändrade inställningar: allergier/kost (fri text), antal portioner, och dagliga mål för protein, kolhydrater, fett (gram) och vatten (ml). Ange bara det som ska ändras.',
+    parameters: {
+      type: 'object',
+      properties: { allergies: { type: 'string' }, portions: { type: 'integer' }, protein_g: { type: 'integer' }, carbs_g: { type: 'integer' }, fat_g: { type: 'integer' }, water_ml: { type: 'integer' } },
+    },
+  },
+{
+    name: 'remember',
+    description: 'Föreslå att komma ihåg en preferens eller ett faktum om användaren som ska påverka framtida svar (t.ex. "gillar inte svamp", "tränar helst på morgonen"). Sparas när användaren bekräftat.',
+    parameters: { type: 'object', properties: { fact: { type: 'string' } }, required: ['fact'] },
+  },
+{ name: 'forget', description: 'Föreslå att glömma något som sparats med remember.', parameters: { type: 'object', properties: { fact: { type: 'string' } }, required: ['fact'] } }
+].map((f) => ({ type: 'function' as const, function: f as { name: string; description: string; parameters: unknown } }))
 
 export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome {
   switch (name) {
-    case 'get_schedule': {
-      const d = str(args.date)
-      if (!DATE.test(d)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
-      // Idag får varje lektion ett läge efter klockslaget, så att svaret inte låter som att allt är kvar.
-      const now = d === ctx.today ? ctx.nowTime : undefined
-      const state = (l: Lesson) => (!now ? undefined : l.end <= now ? 'slut' : l.start <= now ? 'pågår' : 'kvar')
-      return { result: { date: d, ...(now ? { now } : {}), lessons: lessonsOn(d, ctx.lessons, ctx.settings).map((l) => ({ ...lessonView(l, ctx.subjects), ...(now ? { state: state(l) } : {}) })) } }
-    }
-    case 'get_overview': {
-      const from = str(args.from)
-      const to = str(args.to) || from
-      if (!DATE.test(from) || !DATE.test(to)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
-      const span = daysBetween(from, to)
-      if (span < 0 || span > 13) return err('Intervallet måste vara 1–14 dagar.')
-      const subjectName = (id?: string) => ctx.subjects.find((x) => x.id === id)?.name
-      const todayIso = ctx.today ?? toISODate(new Date())
-      const now = ctx.nowTime
-      const days = Array.from({ length: span + 1 }, (_, i) => {
-        const d = addDays(from, i)
-        const allLessons = lessonsOn(d, ctx.lessons, ctx.settings)
-        const allEvents = eventsOn(d, ctx.events)
-        const base = {
-          date: d,
-          weekday: WEEKDAYS_LONG[weekdayOf(d) - 1],
-          tasksDue: tasksOn(d, ctx.tasks).map((t) => ({ title: t.title, subject: subjectName(t.subjectId), done: t.done, time: t.time, note: t.note })),
-          workoutsDone: ctx.workouts.filter((w) => w.date === d).map((w) => w.title),
-        }
-        if (d !== todayIso || !now) {
-          return {
-            ...base,
-            lessons: allLessons.map((l) => lessonView(l, ctx.subjects)),
-            events: allEvents.map((e) => ({ title: e.title, start: e.start, end: e.end, note: e.note || undefined })),
-            reminders: ctx.reminders.filter((r) => occursOn(r, d)).sort((a, b) => a.time.localeCompare(b.time)).map((r) => ({ title: r.title, time: r.time })),
-            packing: allPackItems(d, allLessons, ctx.subjects, ctx.events),
-          }
-        }
-        // Idag: bara det som är kvar efter klockslaget. Det som redan varit räknas bara.
-        const lessonsLeft = allLessons.filter((l) => l.end > now)
-        const eventsLeft = allEvents.filter((e) => !e.start || (e.end ?? e.start) > now)
-        const remindersLeft = ctx.reminders.filter((r) => occursOn(r, d) && r.time > now).sort((a, b) => a.time.localeCompare(b.time))
-        const schoolOver = allLessons.length > 0 && lessonsLeft.length === 0
-        return {
-          ...base,
-          now,
-          lessons: lessonsLeft.map((l) => ({ ...lessonView(l, ctx.subjects), ...(l.start <= now ? { ongoing: true } : {}) })),
-          events: eventsLeft.map((e) => ({ title: e.title, start: e.start, end: e.end, note: e.note || undefined })),
-          reminders: remindersLeft.map((r) => ({ title: r.title, time: r.time })),
-          packing: lessonsLeft.length || eventsLeft.length ? allPackItems(d, lessonsLeft, ctx.subjects, eventsLeft) : [],
-          ...(allLessons.length - lessonsLeft.length > 0 ? { lessonsAlreadyOver: allLessons.length - lessonsLeft.length } : {}),
-          ...(allEvents.length - eventsLeft.length > 0 ? { eventsAlreadyOver: allEvents.length - eventsLeft.length } : {}),
-          ...(schoolOver ? { schoolOver: `Skolan slutade ${allLessons.reduce((m, l) => (l.end > m ? l.end : m), '00:00')}.` } : {}),
-        }
-      })
-      const overdue = ctx.tasks.filter((t) => !t.done && t.deadline < todayIso).map((t) => ({ title: t.title, subject: subjectName(t.subjectId), deadline: t.deadline }))
-      const empty = days.every((d) => !d.lessons.length && !d.events.length && !d.tasksDue.length && !d.reminders.length) && overdue.length === 0
-      const todayOnly = span === 0 && from === todayIso && now
-      return {
-        result: {
-          days,
-          ...(overdue.length ? { overdueTasks: overdue } : {}),
-          ...(empty ? { note: todayOnly ? `Inget kvar idag efter klockan ${now}.` : 'Inget inplanerat under perioden.' } : {}),
-        },
-      }
-    }
-    case 'get_packing_list': {
-      const d = str(args.date)
-      if (!DATE.test(d)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
-      const groups = packingFor(lessonsOn(d, ctx.lessons, ctx.settings), ctx.subjects)
-      const fromEvents = eventPackingFor(d, ctx.events, groups)
-      return { result: { date: d, packing: [...groups.map((g) => ({ subject: g.subject.name, items: g.items.map((i) => i.text) })), ...fromEvents.map((e) => ({ event: e.event.title, items: e.items }))] } }
-    }
-    case 'list_events': {
-      const from = str(args.from)
-      const to = str(args.to)
-      if (!DATE.test(from) || !DATE.test(to)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
-      const span = daysBetween(from, to)
-      if (span < 0 || span > 62) return err('Intervallet måste vara 0–62 dagar.')
-      const events = Array.from({ length: span + 1 }, (_, i) => eventsOn(addDays(from, i), ctx.events)).flat()
-      return { result: { events: events.map((e) => ({ id: e.id, title: e.title, date: e.date, start: e.start, end: e.end, note: e.note || undefined, pack: e.packItems, fromGoogle: e.source === 'google' || undefined })) } }
-    }
-    case 'list_tasks': {
-      const from = str(args.from)
-      const to = str(args.to)
-      if (!DATE.test(from) || !DATE.test(to) || to < from) return err('Ogiltigt datumintervall, använd YYYY-MM-DD.')
-      const includeDone = args.include_done === true
-      const includeOverdue = args.include_overdue !== false
-      const list = ctx.tasks
-        .filter((t) => (includeDone || !t.done) && t.deadline <= to && (t.deadline >= from || (includeOverdue && !t.done)))
-        .sort((a, b) => a.deadline.localeCompare(b.deadline))
-      return {
-        result: {
-          tasks: list.map((t) => ({
-            title: t.title,
-            deadline: t.deadline,
-            time: t.time,
-            note: t.note,
-            subject: ctx.subjects.find((s) => s.id === t.subjectId)?.name,
-            done: t.done,
-            overdue: !t.done && t.deadline < (ctx.today ?? toISODate(new Date())) ? true : undefined,
-          })),
-        },
-      }
-    }
-    case 'propose_task': {
-      const title = str(args.title)
-      const deadline = str(args.deadline)
-      const subjectName = str(args.subject)
-      if (!title) return err('Titel saknas.')
-      if (!DATE.test(deadline)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
-      const time = str(args.time)
-      if (time && !TIME.test(time)) return err('Ogiltigt klockslag, använd HH:mm.')
-      const note = str(args.note).slice(0, 500)
-      const subject = subjectName ? findSubject(subjectName, ctx.subjects) : undefined
-      return {
-        result: {
-          status: 'awaiting_user_confirmation',
-          message: 'Förslaget visas för användaren. Det är inte inlagt än.',
-          ...(subjectName && !subject ? { note: `Ämnet "${subjectName}" finns inte; uppgiften föreslås utan ämne.` } : {}),
-        },
-        card: { type: 'task', task: { title, deadline, ...(time ? { time } : {}), ...(note ? { note } : {}), ...(subject ? { subjectId: subject.id } : {}) } },
-      }
-    }
-    case 'propose_update_event': {
-      const old = ctx.events.find((e) => e.id === str(args.id))
-      if (!old) return err('Hittar ingen händelse med det id:t. Hämta id med list_events.')
-      if (old.source === 'google') return err('Händelsen kommer från Google Kalender och kan bara ändras där.')
-      const date = 'date' in args ? str(args.date) : old.date
-      const title = 'title' in args ? str(args.title) : old.title
-      const note = 'note' in args ? str(args.note) : old.note
-      let start: string | undefined = old.start
-      let end: string | undefined = old.end
-      if ('start' in args) {
-        start = str(args.start) || undefined
-        if (!start) end = undefined
-      }
-      if ('end' in args && start) end = str(args.end) || undefined
-      if (!title) return err('Titel får inte vara tom.')
-      if (!DATE.test(date)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
-      if (start && !TIME.test(start)) return err('Ogiltig starttid, använd HH:mm.')
-      if (end && (!start || !TIME.test(end) || end <= start)) return err('Ogiltig sluttid.')
-      const after = { title, date, ...(start ? { start } : {}), ...(end ? { end } : {}), note }
-      if (JSON.stringify(after) === JSON.stringify({ title: old.title, date: old.date, ...(old.start ? { start: old.start } : {}), ...(old.end ? { end: old.end } : {}), note: old.note }))
-        return err('Inga ändringar jämfört med nuvarande händelse.')
-      return {
-        result: { status: 'awaiting_user_confirmation', message: 'Ändringen visas för användaren. Den är inte genomförd än.' },
-        card: { type: 'event_update', id: old.id, before: describeEvent(old), afterText: describeEvent(after), after },
-      }
-    }
-    case 'propose_delete_event': {
-      const old = ctx.events.find((e) => e.id === str(args.id))
-      if (!old) return err('Hittar ingen händelse med det id:t. Hämta id med list_events.')
-      if (old.source === 'google') return err('Händelsen kommer från Google Kalender och kan bara tas bort där.')
-      return {
-        result: { status: 'awaiting_user_confirmation', message: 'Borttagningen visas för användaren. Inget är borttaget än.' },
-        card: { type: 'event_delete', id: old.id, summary: describeEvent(old) },
-      }
-    }
-    case 'propose_update_lesson': {
-      const old = ctx.lessons.find((l) => l.id === str(args.id))
-      if (!old) return err('Hittar ingen lektion med det id:t. Hämta id med get_schedule.')
-      const weekday = 'weekday' in args ? Number(args.weekday) : old.weekday
-      const start = 'start' in args ? str(args.start) : old.start
-      const end = 'end' in args ? str(args.end) : old.end
-      const room = 'room' in args ? str(args.room) : old.room
-      const teacher = 'teacher' in args ? str(args.teacher) : old.teacher
-      if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) return err('Ogiltig veckodag, använd 1–7.')
-      if (!TIME.test(start) || !TIME.test(end) || end <= start) return err('Ogiltig tid, använd HH:mm och sluttid efter starttid.')
-      const after = { weekday, start, end, room, teacher }
-      if (JSON.stringify(after) === JSON.stringify({ weekday: old.weekday, start: old.start, end: old.end, room: old.room, teacher: old.teacher }))
-        return err('Inga ändringar jämfört med nuvarande lektion.')
-      return {
-        result: { status: 'awaiting_user_confirmation', message: 'Ändringen visas för användaren. Den är inte genomförd än.' },
-        card: {
-          type: 'lesson_update',
-          id: old.id,
-          before: describeLesson(old, ctx.subjects),
-          afterText: describeLesson({ ...after, subjectId: old.subjectId }, ctx.subjects),
-          after,
-        },
-      }
-    }
-    case 'propose_delete_lesson': {
-      const old = ctx.lessons.find((l) => l.id === str(args.id))
-      if (!old) return err('Hittar ingen lektion med det id:t. Hämta id med get_schedule.')
-      return {
-        result: { status: 'awaiting_user_confirmation', message: 'Borttagningen visas för användaren. Inget är borttaget än.' },
-        card: { type: 'lesson_delete', id: old.id, summary: describeLesson(old, ctx.subjects) },
-      }
-    }
     case 'list_pantry': {
       const today = ctx.today ?? toISODate(new Date())
       return {
@@ -526,8 +194,10 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
         },
       }
     }
+
     case 'list_shopping':
       return { result: { items: ctx.shopping.map((i) => ({ name: i.name, amount: i.amount, done: i.done })) } }
+
     case 'propose_shopping_items': {
       const items = cleanItems(args.items)
       if ('error' in items) return err(items.error)
@@ -543,6 +213,7 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
         card: { type: 'shopping_add', items: fresh },
       }
     }
+
     case 'propose_pantry_add': {
       const items = cleanItems(args.items, true)
       if ('error' in items) return err(items.error)
@@ -551,6 +222,7 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
         card: { type: 'pantry_add', items: items.list },
       }
     }
+
     case 'propose_pantry_remove': {
       const names = Array.isArray(args.names) ? args.names.filter((n): n is string => typeof n === 'string' && n.trim() !== '').slice(0, 30) : []
       if (names.length === 0) return err('Inga varor angavs.')
@@ -571,6 +243,7 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
         card: { type: 'pantry_remove', ids: found.map((p) => p.id), names: found.map((p) => p.name) },
       }
     }
+
     case 'get_nutrition': {
       const from = str(args.from)
       const to = str(args.to) || from
@@ -592,6 +265,7 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
         },
       }
     }
+
     case 'propose_meal': {
       const name = str(args.name).slice(0, 100)
       const today = ctx.today ?? toISODate(new Date())
@@ -611,6 +285,7 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
         card: { type: 'meal_add', meal: { date, name, protein, carbs, fat, ...(time ? { time } : {}), ...(kcal !== undefined ? { kcal: Math.round(kcal) } : {}) } },
       }
     }
+
     case 'propose_water': {
       const ml = typeof args.ml === 'number' ? Math.round(args.ml) : NaN
       const date = str(args.date) || (ctx.today ?? toISODate(new Date()))
@@ -621,116 +296,94 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
         card: { type: 'water_add', date, ml },
       }
     }
-    case 'plan_workouts': {
-      const today = ctx.today ?? toISODate(new Date())
-      const nowTime = ctx.nowTime ?? '12:00'
-      const from = str(args.from) || (nowTime < '17:00' ? today : addDays(today, 1))
+
+    case 'find_recipes':
+      return err('Receptsökningen körs av appen.')
+
+    case 'get_meal_plan': {
+      const from = str(args.from) || (ctx.today ?? toISODate(new Date()))
       if (!DATE.test(from)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
       const days = args.days === undefined ? 7 : Number(args.days)
-      if (!Number.isInteger(days) || days < 3 || days > 14) return err('days måste vara 3–14.')
-      if (!Array.isArray(args.sessions) || args.sessions.length === 0 || args.sessions.length > 5) return err('Ange 1–5 sorters pass i sessions.')
-      const sessions = []
-      let total = 0
-      for (const raw of args.sessions) {
-        const r = (raw ?? {}) as Record<string, unknown>
-        const type = str(r.type).slice(0, 30)
-        const count = Number(r.count)
-        const minutes = r.minutes === undefined ? undefined : Number(r.minutes)
-        if (!type || !Number.isInteger(count) || count < 1 || count > 7) return err('Varje pass-sort behöver type och count 1–7.')
-        if (minutes !== undefined && (!Number.isInteger(minutes) || minutes < 15 || minutes > 240)) return err('minutes måste vara 15–240.')
-        total += count
-        sessions.push({ type, count, ...(minutes !== undefined ? { minutes } : {}) })
-      }
-      if (total > 14) return err('Max 14 pass totalt.')
-      const avoid = Array.isArray(args.avoid_weekdays) ? args.avoid_weekdays.filter((d): d is number => Number.isInteger(d) && d >= 1 && d <= 7) : []
-      const pt = args.preferred_time
-      const plan = planWorkouts({
-        from,
-        days,
-        sessions,
-        lessons: ctx.lessons,
-        events: ctx.events,
-        tasks: ctx.tasks,
-        logged: ctx.workouts,
-        settings: ctx.settings,
-        avoidWeekdays: avoid,
-        ...(from === today ? { earliestToday: nowTime } : {}),
-        preferredTime: pt === 'morning' || pt === 'afternoon' || pt === 'evening' ? pt : undefined,
-      })
+      if (!Number.isInteger(days) || days < 1 || days > 14) return err('days måste vara 1–14.')
+      const to = addDays(from, days - 1)
+      const list = ctx.mealPlan.filter((d) => d.date >= from && d.date <= to).sort((a, b) => a.date.localeCompare(b.date))
       return {
         result: {
-          from,
-          days,
-          plan: plan.sessions,
-          restDays: plan.restDays.map((d) => `${WEEKDAYS_LONG[weekdayOf(d) - 1]} ${d}`),
-          alreadyPlanned: plan.existing,
-          recentWorkouts: plan.recent,
-          requested: sessions.reduce((s, x) => s + x.count, 0),
-          warnings: plan.warnings,
-          rulesUsed: TRAINING_RULES,
-          next: 'Presentera planen kort med varför dagarna valts. Om planen har färre pass än requested: förklara konkret varför (warnings) och erbjud alternativ (fler dagar, två pass samma dag t.ex. löpning på morgonen och gym på kvällen, eller färre pass). Nämn recentWorkouts om de påverkat planen. Erbjud att lägga in passen med propose_events.',
+          dinners: list.map((d) => ({ date: d.date, title: d.title, reason: d.reason || undefined, minutes: d.minutes ?? undefined, portions: d.portions, ingredients: d.ingredients, steps: d.steps, perPortion: d.nutrition })),
+          ...(list.length === 0 ? { note: 'Ingen veckomeny för perioden. Användaren kan göra en under Mat → Meny.' } : {}),
         },
       }
     }
-    case 'propose_events': {
-      if (!Array.isArray(args.events) || args.events.length === 0) return err('Inga händelser angavs.')
-      if (args.events.length > 14) return err('Max 14 händelser på en gång.')
-      const events: Omit<CalendarEvent, 'id' | 'updatedAt'>[] = []
-      for (const raw of args.events) {
-        const r = (raw ?? {}) as Record<string, unknown>
-        const title = str(r.title).slice(0, 100)
-        const d = str(r.date)
-        const start = str(r.start)
-        const end = str(r.end)
-        if (!title) return err('Titel saknas på en händelse.')
-        if (!DATE.test(d)) return err(`Ogiltigt datum för "${title}", använd YYYY-MM-DD.`)
-        if (start && !TIME.test(start)) return err(`Ogiltig starttid för "${title}", använd HH:mm.`)
-        if (end && (!start || !TIME.test(end) || end <= start)) return err(`Ogiltig sluttid för "${title}".`)
-        events.push({ title, date: d, ...(start ? { start } : {}), ...(end ? { end } : {}), note: str(r.note).slice(0, 300), ...packOf(r.pack) })
-      }
-      return {
-        result: { status: 'awaiting_user_confirmation', message: 'Förslaget visas för användaren. Inget är inlagt än.' },
-        card: { type: 'events_add', events },
-      }
+
+    case 'propose_shopping_update': {
+      const open = ctx.shopping.filter((i) => !i.done)
+      const pick = (names: string[]) => names.map((n) => open.find((i) => foodKey(i.name) === foodKey(n))).filter((x): x is (typeof open)[number] => Boolean(x))
+      const bought = pick(strings(args.mark_bought))
+      const removed = pick(strings(args.remove)).filter((i) => !bought.includes(i))
+      if (bought.length === 0 && removed.length === 0) return err('Hittade inga av varorna på inköpslistan. Kontrollera namnen med list_shopping.')
+      return proposed({ type: 'shopping_update', boughtIds: bought.map((i) => i.id), removeIds: removed.map((i) => i.id), bought: bought.map((i) => i.name), removed: removed.map((i) => i.name) })
     }
-    case 'find_contact': {
-      const found = findContacts(str(args.name), ctx.contacts)
-      return { result: { contacts: found.map((c) => ({ name: c.name, email: c.email })) } }
+
+    case 'propose_pantry_update': {
+      const f = findByName(ctx.pantry, str(args.name), (p) => p.name)
+      if (!f.hit) return err(f.error!)
+      const p = f.hit
+      const amount = args.amount === undefined ? p.amount : str(args.amount).slice(0, 30) || undefined
+      const expires = args.expires === undefined ? p.expires : str(args.expires) || undefined
+      if (expires && !DATE.test(expires)) return err('Ogiltigt datum, använd YYYY-MM-DD eller "" för att ta bort.')
+      if (amount === p.amount && expires === p.expires) return err('Inga ändringar jämfört med nuvarande vara.')
+      return proposed({
+        type: 'pantry_update',
+        id: p.id,
+        before: [p.name, p.amount, p.expires && `bäst före ${short(p.expires)}`].filter(Boolean).join(', '),
+        after: { name: p.name, ...(amount ? { amount } : {}), ...(expires ? { expires } : {}) },
+      })
     }
-    case 'propose_event': {
-      const title = str(args.title)
-      const d = str(args.date)
-      const start = str(args.start)
-      const end = str(args.end)
-      if (!title) return err('Titel saknas.')
-      if (!DATE.test(d)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
-      if (start && !TIME.test(start)) return err('Ogiltig starttid, använd HH:mm.')
-      if (end && (!start || !TIME.test(end) || end <= start)) return err('Ogiltig sluttid.')
-      return {
-        result: { status: 'awaiting_user_confirmation', message: 'Förslaget visas för användaren. Det är inte inlagt än.' },
-        card: { type: 'event', event: { title, date: d, ...(start ? { start } : {}), ...(end ? { end } : {}), note: str(args.note), ...packOf(args.pack) } },
+
+    case 'propose_preferences': {
+      const food: { allergies?: string; portions?: number } = {}
+      const nutrition: Record<string, number> = {}
+      const summary: string[] = []
+      const int = (v: unknown, min: number, max: number) => (Number.isInteger(v) && (v as number) >= min && (v as number) <= max ? (v as number) : null)
+      if (args.allergies !== undefined) {
+        food.allergies = str(args.allergies).slice(0, 500)
+        summary.push(`Allergier/kost: ${food.allergies || 'inga'}`)
       }
+      if (args.portions !== undefined) {
+        const v = int(args.portions, 1, 12)
+        if (v === null) return err('Portioner måste vara 1–12.')
+        food.portions = v
+        summary.push(`Portioner: ${v}`)
+      }
+      for (const [key, field, label, max] of [
+        ['protein_g', 'proteinG', 'Protein', 1000],
+        ['carbs_g', 'carbsG', 'Kolhydrater', 2000],
+        ['fat_g', 'fatG', 'Fett', 1000],
+        ['water_ml', 'waterMl', 'Vatten', 20000],
+      ] as const) {
+        if (args[key] === undefined) continue
+        const v = int(args[key], 0, max)
+        if (v === null) return err(`${label}: ogiltigt värde.`)
+        nutrition[field] = v
+        summary.push(`${label}: ${v} ${key === 'water_ml' ? 'ml' : 'g'} per dag`)
+      }
+      if (summary.length === 0) return err('Inget att ändra.')
+      return proposed({ type: 'prefs_update', food, nutrition, summary })
     }
-    case 'draft_email': {
-      const to = str(args.to)
-      const subject = str(args.subject)
-      const body = str(args.body)
-      if (!to || !subject || !body) return err('Mottagare, ämne och text krävs.')
-      let email = to
-      let toName: string | undefined
-      if (!to.includes('@')) {
-        const found = findContacts(to, ctx.contacts)
-        if (found.length === 0) return err(`Ingen kontakt som matchar "${to}". Be användaren ange e-postadress eller lägga till kontakten i Inställningar.`)
-        if (found.length > 1) return err(`Flera kontakter matchar: ${found.map((c) => `${c.name} <${c.email}>`).join(', ')}. Fråga användaren vilken som avses.`)
-        email = found[0].email
-        toName = found[0].name
-      }
-      return {
-        result: { status: 'draft_shown_to_user', message: 'Utkastet visas för användaren. Inget mejl har skickats.' },
-        card: { type: 'email', to: email, toName, subject, body },
-      }
+
+    case 'remember': {
+      const fact = str(args.fact).slice(0, 200)
+      if (!fact) return err('Inget att komma ihåg.')
+      if (ctx.settings.memories.some((m) => foodKey(m) === foodKey(fact))) return err('Det kommer jag redan ihåg.')
+      if (ctx.settings.memories.length >= 30) return err('Minnet är fullt (30 saker). Be användaren ta bort något först.')
+      return proposed({ type: 'memory_add', fact })
     }
-    default:
-      return runMoreTool(name, args, ctx) ?? err(`Okänt verktyg: ${name}`)
+
+    case 'forget': {
+      const f = findByName(ctx.settings.memories, str(args.fact), (m) => m)
+      if (!f.hit) return err(f.error!)
+      return proposed({ type: 'memory_delete', fact: f.hit })
+    }
   }
+  return err(`Okänt verktyg: ${name}`)
 }

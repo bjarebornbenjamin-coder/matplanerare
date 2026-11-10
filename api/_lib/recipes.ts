@@ -166,7 +166,7 @@ async function fetchPage(url: URL, fetchFn: FetchFn): Promise<string | null> {
     const res = await fetchFn(url.toString(), {
       signal: ctrl.signal,
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Studieassistent/1.0; personlig receptsökning)', Accept: 'text/html', 'Accept-Language': 'sv-SE,sv;q=0.9' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Matplaneraren/1.0; personlig receptsökning)', Accept: 'text/html', 'Accept-Language': 'sv-SE,sv;q=0.9' },
     })
     if (!res.ok || !(res.headers.get('content-type') ?? 'text/html').includes('html')) return null
     const text = await res.text()

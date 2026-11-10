@@ -33,7 +33,7 @@ export function SyncSection() {
           <p className="muted">Datan finns kvar på enheten när du loggar ut, men synkas inte längre.</p>
         </>
       ) : (
-        <LoginForm intro="Logga in så följer schema, ämnen, händelser och uppgifter med mellan dina enheter. Din befintliga data på den här enheten laddas upp första gången." />
+        <LoginForm intro="Logga in så följer meny, matlager, inköpslista och kost med mellan dina enheter. Din befintliga data på den här enheten laddas upp första gången." />
       )}
     </>
   )
