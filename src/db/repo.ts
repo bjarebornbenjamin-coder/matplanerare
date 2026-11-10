@@ -9,6 +9,7 @@ export const newId = () => crypto.randomUUID()
 export const DEFAULT_FOOD: FoodSettings = {
   allergies: '',
   portions: 2,
+  weekWishes: '',
   quickWeekdays: [],
   trainingWeekdays: [],
   shopping: { enabled: true, weekday: 5, time: '16:00' },

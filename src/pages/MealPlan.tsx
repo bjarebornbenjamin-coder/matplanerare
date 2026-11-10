@@ -30,6 +30,8 @@ export function MealPlanTab() {
   const [notFound, setNotFound] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
   const [openIng, setOpenIng] = useState<Set<string>>(new Set())
+  const [wishes, setWishes] = useState<string | null>(null)
+  const [allergies, setAllergies] = useState<string | null>(null)
   if (!plan || !pantry || !settings) return null
 
   const upcoming = plan.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date))
@@ -40,7 +42,8 @@ export function MealPlanTab() {
   async function findRecipe(d: PlannedDinner, headers: Record<string, string>) {
     setFinding((s) => new Set(s).add(d.id))
     try {
-      const s = await getSettings()
+      const stored = await getSettings()
+      const s = { ...stored, food: { ...stored.food, weekWishes: (wishes ?? stored.food.weekWishes ?? '').trim() } }
       const [r] = await findRecipes({ mode: 'any', dish: d.title, count: 1, pantry: pantry!, food: s.food, memories: s.memories, today }, headers)
       await db.mealPlan.update(d.id, {
         url: r.url,
@@ -100,6 +103,20 @@ export function MealPlanTab() {
   return (
     <>
       <h2>Planera</h2>
+      <label className="field wish-field">
+        <span>Önskemål för veckan</span>
+        <textarea
+          rows={3}
+          maxLength={500}
+          placeholder={'t.ex. Fredag: något lyxigt.\nOnsdag: under 30 minuter.'}
+          value={wishes ?? settings.food.weekWishes ?? ''}
+          onChange={(e) => setWishes(e.target.value)}
+          onBlur={() => {
+            if (wishes !== null) void saveSettings({ food: { ...settings.food, weekWishes: wishes.trim() } })
+            setWishes(null)
+          }}
+        />
+      </label>
       <div className="actions" style={{ marginTop: 8 }}>
         <label className="inline-field">
           <span>Dagar</span>
@@ -115,7 +132,28 @@ export function MealPlanTab() {
         <summary>Anpassa veckan</summary>
         <WeekdayPicker label="Kort om tid (snabba middagar)" days={settings.food.quickWeekdays} onChange={(quickWeekdays) => saveSettings({ food: { ...settings.food, quickWeekdays } })} />
         <WeekdayPicker label="Träningsdagar (proteinrikt)" days={settings.food.trainingWeekdays} onChange={(trainingWeekdays) => saveSettings({ food: { ...settings.food, trainingWeekdays } })} />
-        <p className="footnote">AI:n väljer rätterna utifrån lagret, dina mål och de här dagarna. Kolla allergier.</p>
+        <div className="two">
+          <label className="field">
+            <span>Allergier / kost</span>
+            <input
+              type="text"
+              placeholder="t.ex. nötter"
+              value={allergies ?? settings.food.allergies}
+              onChange={(e) => setAllergies(e.target.value)}
+              onBlur={() => {
+                if (allergies !== null) void saveSettings({ food: { ...settings.food, allergies: allergies.trim() } })
+                setAllergies(null)
+              }}
+            />
+          </label>
+          <label className="field">
+            <span>Portioner</span>
+            <select value={settings.food.portions} onChange={(e) => saveSettings({ food: { ...settings.food, portions: Number(e.target.value) } })}>
+              {Array.from({ length: 8 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="footnote">AI:n väljer rätterna utifrån lagret, dina önskemål och de här dagarna. Kolla allergier.</p>
       </details>
       <AiProgress active={busy} expected={30} label="Planerar middagarna" />
       {error && (

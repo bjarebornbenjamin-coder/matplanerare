@@ -11,6 +11,8 @@ export interface FoodSettings {
   quickWeekdays: number[]
   /** Veckodagar när man tränar: då föreslås proteinrika middagar. */
   trainingWeekdays: number[]
+  /** Önskemål för veckan i fri text, t.ex. "fredag något lyxigt". Skickas med när menyn görs. */
+  weekWishes?: string
   /** Notis med inköpslistan en viss veckodag (1 = måndag … 7 = söndag). */
   shopping: { enabled: boolean; weekday: number; time: HHmm }
   /** Notis när mat snart går ut. */

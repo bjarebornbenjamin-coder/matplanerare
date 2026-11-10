@@ -1,15 +1,11 @@
 import { useState, type FormEvent } from 'react'
-import { AiProgress } from '../components/AiProgress'
-import { DoneButton } from '../components/DoneButton'
 import { Link } from 'react-router-dom'
 import { PantryForm } from '../components/PantryForm'
-import { MODE_LABELS, findRecipes, ingredientStatuses, type FoundRecipe, type IngredientLine, type RecipeMode } from '../ai/recipeSearch'
-import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, runOut, saveSettings, saveShoppingItem } from '../db/repo'
+import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, runOut, saveShoppingItem } from '../db/repo'
 import { toISODate } from '../domain/dates'
 import { expiryLabel, expiryStatus, expiringWithin, sortPantry } from '../domain/food'
 import type { PantryItem } from '../domain/types'
-import { useFieldError, useNow, usePantry, useSettings, useShopping } from '../hooks'
-import { authHeaders } from '../lib/auth'
+import { useFieldError, useNow, usePantry, useShopping } from '../hooks'
 import { undoable } from '../lib/undo'
 
 function RunOutDialog({ item, onClose }: { item: PantryItem; onClose: () => void }) {
@@ -130,144 +126,6 @@ export function ShoppingTab() {
         </>
       )}
       {message && <p className="muted" role="status">{message}</p>}
-    </>
-  )
-}
-
-const MODE_KEY = 'recipe-mode'
-
-export function RecipesTab() {
-  const pantry = usePantry()
-  const settings = useSettings()
-  const today = toISODate(useNow())
-  const [mode, setMode] = useState<RecipeMode>(() => {
-    try {
-      const v = localStorage.getItem(MODE_KEY)
-      return v === 'pantry' || v === 'some' || v === 'any' ? v : 'some'
-    } catch {
-      return 'some'
-    }
-  })
-  const [wish, setWish] = useState('')
-  const [recipes, setRecipes] = useState<FoundRecipe[] | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [notes, setNotes] = useState<Record<string, string>>({})
-  const [allergies, setAllergies] = useState<string | null>(null)
-  if (!pantry || !settings) return null
-  const food = settings.food
-  const usable = pantry.filter((p) => !p.expires || p.expires >= today)
-
-  function chooseMode(m: RecipeMode) {
-    setMode(m)
-    try {
-      localStorage.setItem(MODE_KEY, m)
-    } catch {
-      /* valet sparas bara för stunden */
-    }
-  }
-
-  async function search() {
-    setBusy(true)
-    setError('')
-    setNotes({})
-    try {
-      const found = await findRecipes({ mode, pantry: usable, food, memories: settings!.memories, today, wish }, await authHeaders())
-      // Det som kräver minst handling först (jämförelsen går på namn, så det är en ungefärlig sortering).
-      const missingCount = (r: FoundRecipe) => ingredientStatuses(r.ingredients, usable).filter((l) => l.status === 'missing').length
-      setRecipes(mode === 'any' ? found : [...found].sort((a, b) => missingCount(a) - missingCount(b)))
-    } catch (e) {
-      setRecipes(null)
-      setError(e instanceof Error ? e.message : 'Något gick fel.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function addMissing(r: FoundRecipe, missing: IngredientLine[]) {
-    const res = await addShoppingItems(missing.map((m) => ({ name: m.name, amount: m.amount, note: r.title })))
-    setNotes((n) => ({ ...n, [r.url]: `${res.added} ${res.added === 1 ? 'vara' : 'varor'} lades på inköpslistan${res.skipped ? ` (${res.skipped} fanns redan)` : ''}.` }))
-  }
-
-  return (
-    <>
-      <label className="field">
-        <span>Utgå från</span>
-        <select value={mode} onChange={(e) => chooseMode(e.target.value as RecipeMode)}>
-          {(Object.keys(MODE_LABELS) as RecipeMode[]).map((m) => <option key={m} value={m}>{MODE_LABELS[m]}</option>)}
-        </select>
-      </label>
-      <div className="two">
-        <label className="field">
-          <span>Önskemål (valfritt)</span>
-          <input type="text" placeholder="t.ex. kyckling" value={wish} onChange={(e) => setWish(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>Allergier / kost</span>
-          <input
-            type="text"
-            placeholder="t.ex. nötter"
-            value={allergies ?? food.allergies}
-            onChange={(e) => setAllergies(e.target.value)}
-            onBlur={() => {
-              if (allergies !== null) void saveSettings({ food: { ...food, allergies: allergies.trim() } })
-              setAllergies(null)
-            }}
-          />
-        </label>
-      </div>
-      <p className="muted">
-        {mode !== 'any' && usable.length === 0
-          ? 'Lägg först in varor i lagret, eller välj Handla det som behövs.'
-          : 'AI:n söker på nätet efter riktiga recept (ICA, Köket, Arla m.fl.). Ingredienserna nedan kommer från receptsidan. Kolla allergier själv.'}
-      </p>
-      <div className="actions" style={{ marginTop: 8 }}>
-        <button type="button" className="btn primary" disabled={busy || (mode !== 'any' && usable.length === 0)} onClick={search}>
-          {busy ? 'Söker… (tar några sekunder)' : recipes ? 'Sök igen' : 'Hitta recept'}
-        </button>
-      </div>
-      <AiProgress active={busy} expected={25} label="Letar efter recept på nätet" />
-      {error && (
-        <>
-          <p className="error" role="alert">{error}</p>
-          <div className="actions" style={{ marginTop: 0 }}><Link to="/installningar/ai" className="btn">Testa anslutningen</Link></div>
-        </>
-      )}
-
-      {recipes?.map((r) => {
-        const lines = ingredientStatuses(r.ingredients, pantry)
-        const missing = lines.filter((l) => l.status === 'missing')
-        const home = lines.filter((l) => l.status === 'pantry').length
-        return (
-          <div key={r.url} className="card recipe">
-            <div className="title">{r.title}</div>
-            <div className="sub">{[r.site, r.servings, r.minutes ? `${r.minutes} min` : null].filter(Boolean).join(' · ')}</div>
-            {r.why && <div className="sub">{r.why}</div>}
-            <div className="sub num">{home} av {lines.length} ingredienser hemma{missing.length ? `, ${missing.length} saknas` : ''}</div>
-            <div className="actions" style={{ marginTop: 8 }}>
-              <a className="btn primary" href={r.url} target="_blank" rel="noreferrer">Öppna receptet</a>
-              {missing.length > 0 && (
-                <DoneButton onClick={() => addMissing(r, missing)} doneText="På inköpslistan" resetKey={missing.map((m) => m.line).join('|')}>
-                  Lägg saknade på inköpslistan ({missing.length})
-                </DoneButton>
-              )}
-            </div>
-            <details style={{ marginTop: 8 }}>
-              <summary style={{ cursor: 'pointer', minHeight: 32, display: 'flex', alignItems: 'center', color: 'var(--primary)' }}>Ingredienser enligt receptet ({lines.length})</summary>
-              <ul className="ingredients">
-                {lines.map((l) => (
-                  <li key={l.line} className={l.status === 'missing' ? 'missing' : ''}>
-                    <span>{l.line}</span>
-                    <span className="sub">{l.status === 'pantry' ? 'har hemma' : l.status === 'staple' ? 'basvara' : 'saknas'}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="sub">Jämförelsen med lagret går på namn, så kolla mängderna själv.</p>
-            </details>
-            {notes[r.url] && <p className="muted" role="status">{notes[r.url]}</p>}
-          </div>
-        )
-      })}
     </>
   )
 }

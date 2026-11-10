@@ -8,14 +8,13 @@ import { useSyncRunner } from './sync/useSyncRunner'
 import { syncConfigured, useSession } from './sync/supabase'
 import { LoginScreen } from './sync/LoginForm'
 import { ChatPage } from './pages/Chat'
-import { MenuPage, PantryPage, RecipesPage, ShoppingPage } from './pages/Pages'
+import { MenuPage, PantryPage, ShoppingPage } from './pages/Pages'
 import { ScanFoodPage } from './pages/ScanFood'
 import { SettingsPage } from './pages/Settings'
 
 /** Undersidor som hör till en flik markerar den fliken i menyn. */
 const TABS = [
   { to: '/', label: 'Meny', also: ['/installningar'] as string[] },
-  { to: '/recept', label: 'Recept', also: [] },
   { to: '/lager', label: 'Lager', also: ['/skanna'] },
   { to: '/inkop', label: 'Inköp', also: [] },
   { to: '/chatt', label: 'Chatt', also: [] },
@@ -71,7 +70,6 @@ export function App() {
         ) : (
           <Routes>
             <Route path="/" element={<MenuPage />} />
-            <Route path="/recept" element={<RecipesPage />} />
             <Route path="/lager" element={<PantryPage />} />
             <Route path="/inkop" element={<ShoppingPage />} />
             <Route path="/skanna" element={<ScanFoodPage />} />

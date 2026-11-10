@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayContext, fetchMealPlan, missingForPlan, parseMealPlan, planStart } from './mealPlan'
+import { MEAL_PLAN_PROMPT, dayContext, fetchMealPlan, mealPlanUserContent, missingForPlan, parseMealPlan, planStart } from './mealPlan'
 import type { PantryItem, PlannedDinner } from '../domain/types'
 
 const food = { quickWeekdays: [2], trainingWeekdays: [3] }
@@ -51,5 +51,15 @@ describe('veckomeny', () => {
     expect(plan[0]).toMatchObject({ title: 'Chili con carne', portions: 4 })
     expect(sent).toContain('Gillar inte svamp')
     expect(JSON.parse(sent).response_format).toEqual({ type: 'json_object' })
+  })
+})
+
+describe('önskemål för veckan', () => {
+  it('skickas med till AI:n, och prompten säger att de går före', () => {
+    const food = { allergies: '', portions: 2, weekWishes: '  Fredag: något lyxigt. Onsdag: under 30 min  ' }
+    const sent = JSON.parse(mealPlanUserContent({ days: [], pantry: [], food, memories: [], recent: [], today: '2026-11-10' }))
+    expect(sent.wishes).toBe('Fredag: något lyxigt. Onsdag: under 30 min')
+    expect(JSON.parse(mealPlanUserContent({ days: [], pantry: [], food: { allergies: '', portions: 2 }, memories: [], recent: [], today: '2026-11-10' })).wishes).toBe('inga')
+    expect(MEAL_PLAN_PROMPT).toMatch(/wishes/)
   })
 })

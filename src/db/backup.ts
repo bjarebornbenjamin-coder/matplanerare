@@ -22,6 +22,7 @@ function parseSettings(v: unknown): Settings {
     portions: typeof f.portions === 'number' && f.portions >= 1 && f.portions <= 12 ? Math.round(f.portions) : DEFAULT_FOOD.portions,
     quickWeekdays: weekdays(f.quickWeekdays),
     trainingWeekdays: weekdays(f.trainingWeekdays),
+    weekWishes: isStr(f.weekWishes) ? f.weekWishes.slice(0, 500) : '',
     shopping: {
       enabled: typeof sh.enabled === 'boolean' ? sh.enabled : DEFAULT_FOOD.shopping.enabled,
       weekday: typeof sh.weekday === 'number' && sh.weekday >= 1 && sh.weekday <= 7 ? sh.weekday : DEFAULT_FOOD.shopping.weekday,

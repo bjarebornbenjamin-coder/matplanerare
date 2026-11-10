@@ -654,3 +654,5 @@ html { scroll-behavior: smooth; scroll-padding-top: 16px; }
 .dinner-ingredients { margin-top: 12px; padding: 10px 14px 6px; border-radius: 12px; background: var(--surface, #fff); }
 .dinner-ingredients .btn.text { padding-left: 0; }
 @media (min-width: 560px) { .dinner-main { padding-left: 66px; } }
+
+.wish-field textarea { min-height: 76px; line-height: 1.4; }
