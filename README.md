@@ -6,12 +6,12 @@ Matplaneraren är utbruten ur Studieassistenten (repot `assistent`, grenen `stud
 
 ## Funktioner
 
-- **Meny (startsidan):** AI:n planerar 3–7 middagar utifrån matlagret (det som går ut först), dina näringsmål, preferenser och allergier. Välj vilka veckodagar du har **kort om tid** (snabba middagar) och vilka som är **träningsdagar** (proteinrikt). För varje dag hämtas ett riktigt recept från nätet, och det som saknas för hela veckan läggs på inköpslistan med ett tryck. Överst visas dagens kost.
+- **Meny (startsidan):** AI:n planerar 3–7 middagar utifrån matlagret (det som går ut först), dina preferenser och allergier. Välj vilka veckodagar du har **kort om tid** (snabba middagar) och vilka som är **träningsdagar** (proteinrikt). För varje dag hämtas ett riktigt recept från nätet, och det som saknas för hela veckan läggs på inköpslistan med ett tryck. Överst visas kvällens middag, vatten idag, lagret och veckan.
 - **Recept:** välj "Bara det jag har hemma", "Det jag har hemma, handla lite" eller "Handla det som behövs". AI:n söker upp riktiga recept (ICA, Köket, Arla m.fl.), ingredienserna läses från receptsidan och jämförs med lagret.
 - **Lager:** varor med mängd och bäst före-datum. Lägg in för hand eller skanna kvitto eller kylskåp med kameran.
 - **Inköp:** inköpslista; köpta varor kan flyttas till lagret.
-- **Kost:** logga måltider (AI kan uppskatta näringen) och vatten, se dagen mot målen och utvecklingen över tid.
-- **Chatt:** matassistent som läser lager, inköpslista, meny och kost och föreslår ändringar som du bekräftar. Söker recept på samma sätt som Recept-sidan.
+- **Vatten:** fyll på glas direkt på startsidan; målet ställs in under Inställningar → Vatten. Appen räknar inte kalorier eller makron.
+- **Chatt:** matassistent som läser lager, inköpslista, meny och vatten och föreslår ändringar som du bekräftar. Söker recept på samma sätt som Recept-sidan.
 - **Notiser:** mat som snart går ut (med kvällens middag) och inköpslistan en vald veckodag.
 
 ## Kommandon

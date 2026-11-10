@@ -36,7 +36,7 @@ describe('synk', () => {
   it('första inloggningen laddar upp befintlig lokal data (migrering)', async () => {
     await a.pantry.put(item('s1', 'Matte'))
     await a.shopping.put({ id: 'l1', name: 'Ägg', done: false, addedAt: '2026-11-08', updatedAt: '' })
-    await a.settings.put({ id: 'main', theme: 'dark', food: { allergies: '', portions: 2, quickWeekdays: [], trainingWeekdays: [], shopping: { enabled: true, weekday: 5, time: '16:00' }, expiry: { enabled: true, time: '08:00' } }, nutrition: { proteinG: 120, carbsG: 250, fatG: 70, waterMl: 2000, glassMl: 250 }, memories: [] })
+    await a.settings.put({ id: 'main', theme: 'dark', food: { allergies: '', portions: 2, quickWeekdays: [], trainingWeekdays: [], shopping: { enabled: true, weekday: 5, time: '16:00' }, expiry: { enabled: true, time: '08:00' } }, nutrition: { waterMl: 2000, glassMl: 250 }, memories: [] })
     const r = await runSync(a, remote, 'u1')
     expect(r.pushed).toBe(3)
     expect([...remote.rows.keys()].sort()).toEqual(['pantry:s1', 'settings:main', 'shopping:l1'])

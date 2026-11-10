@@ -14,7 +14,7 @@ const QUICK_QUESTIONS = [
   { label: 'Vad blir det till middag?', text: 'Vad blir det till middag ikväll?' },
   { label: 'Vad kan jag laga?', text: 'Vad kan jag laga med det jag har hemma?' },
   { label: 'Vad går ut snart?', text: 'Vad i lagret går ut snart, och vad kan jag laga med det?' },
-  { label: 'Hur ligger jag till idag?', text: 'Hur ligger jag till idag med mina mål för protein, kolhydrater, fett och vatten?' },
+  { label: 'Vad ska jag handla?', text: 'Vad behöver jag handla för veckans meny?' },
 ]
 
 function Card({ m }: { m: ChatMessage }) {

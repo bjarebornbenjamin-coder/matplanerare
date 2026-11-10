@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Link, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ToastBar } from './components/ToastBar'
 import { useSettings } from './hooks'
 import { useApplyBackground } from './lib/background'
@@ -8,13 +8,13 @@ import { useSyncRunner } from './sync/useSyncRunner'
 import { syncConfigured, useSession } from './sync/supabase'
 import { LoginScreen } from './sync/LoginForm'
 import { ChatPage } from './pages/Chat'
-import { MenuPage, NutritionPage, PantryPage, RecipesPage, ShoppingPage } from './pages/Pages'
+import { MenuPage, PantryPage, RecipesPage, ShoppingPage } from './pages/Pages'
 import { ScanFoodPage } from './pages/ScanFood'
 import { SettingsPage } from './pages/Settings'
 
 /** Undersidor som hör till en flik markerar den fliken i menyn. */
 const TABS = [
-  { to: '/', label: 'Meny', also: ['/kost', '/installningar'] as string[] },
+  { to: '/', label: 'Meny', also: ['/installningar'] as string[] },
   { to: '/recept', label: 'Recept', also: [] },
   { to: '/lager', label: 'Lager', also: ['/skanna'] },
   { to: '/inkop', label: 'Inköp', also: [] },
@@ -74,11 +74,11 @@ export function App() {
             <Route path="/recept" element={<RecipesPage />} />
             <Route path="/lager" element={<PantryPage />} />
             <Route path="/inkop" element={<ShoppingPage />} />
-            <Route path="/kost" element={<NutritionPage />} />
             <Route path="/skanna" element={<ScanFoodPage />} />
             <Route path="/chatt" element={<ChatPage />} />
             <Route path="/installningar" element={<SettingsPage />} />
             <Route path="/installningar/:del" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         )}
       </main>

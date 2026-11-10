@@ -1,14 +1,12 @@
 import { addDays, daysBetween, toISODate } from '../domain/dates'
 import { daysLeft, foodKey } from '../domain/food'
-import { goalKcal, lastDays, mealKcal, mealsOn } from '../domain/nutrition'
-import type { ChatCard, Meal, PantryItem, PlannedDinner, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import type { ChatCard, PantryItem, PlannedDinner, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
 /** Det chatten kan läsa. */
 export interface ToolContext {
   settings: Settings
   pantry: PantryItem[]
   shopping: ShoppingItem[]
-  meals: Meal[]
   water: WaterDay[]
   mealPlan: PlannedDinner[]
   /** Dagens datum (sätts av chatten så att svaren följer appens klocka). */
@@ -24,7 +22,6 @@ export interface ToolOutcome {
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 const date = { type: 'string', description: 'Datum som YYYY-MM-DD' }
 type Args = Record<string, unknown>
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
@@ -103,28 +100,9 @@ export const TOOL_DEFINITIONS = [
     parameters: { type: 'object', properties: { names: { type: 'array', items: { type: 'string' } } }, required: ['names'] },
   },
 {
-    name: 'get_nutrition',
-    description:
-      'Hämta loggade måltider (med protein, kolhydrater, fett, kcal), vatten och användarens mål för ett datumintervall (max 14 dagar), med dagssummor. Använd för frågor om hur mycket användaren ätit eller druckit och vad som återstår mot målen.',
+    name: 'get_water',
+    description: 'Hämta hur mycket vatten användaren druckit per dag (ml) för ett datumintervall (max 14 dagar), och vattenmålet.',
     parameters: { type: 'object', properties: { from: date, to: { ...date, description: 'Sista datum, samma som from för en dag' } }, required: ['from'] },
-  },
-{
-    name: 'propose_meal',
-    description:
-      'Föreslå att logga en måltid användaren berättat att hen ätit, med din UPPSKATTNING av näringsvärden (hela måltiden, protein/kolhydrater/fett i gram, kcal valfritt). Loggas INTE förrän användaren bekräftat i appen. date är YYYY-MM-DD (standard idag).',
-    parameters: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        date,
-        time: { type: 'string', description: 'HH:mm, valfritt' },
-        protein: { type: 'number' },
-        carbs: { type: 'number' },
-        fat: { type: 'number' },
-        kcal: { type: 'number' },
-      },
-      required: ['name', 'protein', 'carbs', 'fat'],
-    },
   },
 {
     name: 'propose_water',
@@ -146,7 +124,7 @@ export const TOOL_DEFINITIONS = [
   },
 {
     name: 'get_meal_plan',
-    description: 'Veckomenyn: planerade middagar från och med ett datum (standard idag), med ingredienser, steg och näring per portion. Användaren gör menyn under Mat → Meny.',
+    description: 'Veckomenyn: planerade middagar från och med ett datum (standard idag), med ingredienser och steg. Användaren gör menyn under Mat → Meny.',
     parameters: { type: 'object', properties: { from: date, days: { type: 'integer', description: '1–14, standard 7' } } },
   },
 {
@@ -161,10 +139,10 @@ export const TOOL_DEFINITIONS = [
   },
 {
     name: 'propose_preferences',
-    description: 'Föreslå ändrade inställningar: allergier/kost (fri text), antal portioner, och dagliga mål för protein, kolhydrater, fett (gram) och vatten (ml). Ange bara det som ska ändras.',
+    description: 'Föreslå ändrade inställningar: allergier/kost (fri text), antal portioner och dagligt vattenmål (ml). Ange bara det som ska ändras.',
     parameters: {
       type: 'object',
-      properties: { allergies: { type: 'string' }, portions: { type: 'integer' }, protein_g: { type: 'integer' }, carbs_g: { type: 'integer' }, fat_g: { type: 'integer' }, water_ml: { type: 'integer' } },
+      properties: { allergies: { type: 'string' }, portions: { type: 'integer' }, water_ml: { type: 'integer' } },
     },
   },
 {
@@ -244,46 +222,15 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
       }
     }
 
-    case 'get_nutrition': {
+    case 'get_water': {
       const from = str(args.from)
       const to = str(args.to) || from
       if (!DATE.test(from) || !DATE.test(to)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
       const span = daysBetween(from, to)
       if (span < 0 || span > 13) return err('Intervallet måste vara 1–14 dagar.')
-      const goals = ctx.settings.nutrition
-      const days = lastDays(to, span + 1, ctx.meals, ctx.water).map((p) => ({
-        date: p.date,
-        totals: { kcal: p.kcal, protein: p.protein, carbs: p.carbs, fat: p.fat },
-        waterMl: p.waterMl,
-        meals: mealsOn(p.date, ctx.meals).map((m) => ({ name: m.name, time: m.time, kcal: mealKcal(m), protein: m.protein, carbs: m.carbs, fat: m.fat })),
-      }))
-      return {
-        result: {
-          goals: { kcal: goalKcal(goals), protein: goals.proteinG, carbs: goals.carbsG, fat: goals.fatG, waterMl: goals.waterMl, glassMl: goals.glassMl },
-          days,
-          ...(days.every((d) => d.meals.length === 0 && d.waterMl === 0) ? { note: 'Inget loggat under perioden.' } : {}),
-        },
-      }
-    }
-
-    case 'propose_meal': {
-      const name = str(args.name).slice(0, 100)
-      const today = ctx.today ?? toISODate(new Date())
-      const date = str(args.date) || today
-      const time = str(args.time)
-      const n = (v: unknown, max: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max ? Math.round(v * 10) / 10 : null)
-      const protein = n(args.protein, 1000)
-      const carbs = n(args.carbs, 2000)
-      const fat = n(args.fat, 1000)
-      const kcal = args.kcal === undefined ? undefined : n(args.kcal, 10000)
-      if (!name) return err('Namn på måltiden saknas.')
-      if (!DATE.test(date)) return err('Ogiltigt datum, använd YYYY-MM-DD.')
-      if (time && !TIME.test(time)) return err('Ogiltig tid, använd HH:mm.')
-      if (protein === null || carbs === null || fat === null || kcal === null) return err('Protein, kolhydrater och fett måste vara tal (gram) mellan 0 och rimliga gränser.')
-      return {
-        result: { status: 'awaiting_user_confirmation', message: 'Förslaget visas för användaren. Inget är loggat än. Säg att näringsvärdena är en uppskattning.' },
-        card: { type: 'meal_add', meal: { date, name, protein, carbs, fat, ...(time ? { time } : {}), ...(kcal !== undefined ? { kcal: Math.round(kcal) } : {}) } },
-      }
+      const byDate = new Map(ctx.water.map((w) => [w.date, w.ml]))
+      const days = Array.from({ length: span + 1 }, (_, i) => addDays(from, i)).map((d) => ({ date: d, ml: byDate.get(d) ?? 0 }))
+      return { result: { goalMl: ctx.settings.nutrition.waterMl, glassMl: ctx.settings.nutrition.glassMl, days } }
     }
 
     case 'propose_water': {
@@ -309,7 +256,7 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
       const list = ctx.mealPlan.filter((d) => d.date >= from && d.date <= to).sort((a, b) => a.date.localeCompare(b.date))
       return {
         result: {
-          dinners: list.map((d) => ({ date: d.date, title: d.title, reason: d.reason || undefined, minutes: d.minutes ?? undefined, portions: d.portions, ingredients: d.ingredients, steps: d.steps, perPortion: d.nutrition })),
+          dinners: list.map((d) => ({ date: d.date, title: d.title, reason: d.reason || undefined, minutes: d.minutes ?? undefined, portions: d.portions, ingredients: d.ingredients, steps: d.steps })),
           ...(list.length === 0 ? { note: 'Ingen veckomeny för perioden. Användaren kan göra en under Mat → Meny.' } : {}),
         },
       }
@@ -356,16 +303,13 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
         summary.push(`Portioner: ${v}`)
       }
       for (const [key, field, label, max] of [
-        ['protein_g', 'proteinG', 'Protein', 1000],
-        ['carbs_g', 'carbsG', 'Kolhydrater', 2000],
-        ['fat_g', 'fatG', 'Fett', 1000],
         ['water_ml', 'waterMl', 'Vatten', 20000],
       ] as const) {
         if (args[key] === undefined) continue
         const v = int(args[key], 0, max)
         if (v === null) return err(`${label}: ogiltigt värde.`)
         nutrition[field] = v
-        summary.push(`${label}: ${v} ${key === 'water_ml' ? 'ml' : 'g'} per dag`)
+        summary.push(`${label}: ${v} ml per dag`)
       }
       if (summary.length === 0) return err('Inget att ändra.')
       return proposed({ type: 'prefs_update', food, nutrition, summary })

@@ -16,7 +16,7 @@ describe('veckomeny', () => {
   it('tar bara begärda datum, ett per dag, och kräver ingredienser och steg', () => {
     const text = JSON.stringify({
       days: [
-        { date: '2026-11-10', title: 'Pasta carbonara', ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: ['Koka'], nutrition: { kcal: 600, protein: 25, carbs: 70, fat: 22 } },
+        { date: '2026-11-10', title: 'Pasta carbonara', ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: ['Koka'] },
         { date: '2026-11-10', title: 'Dubblett', ingredients: [{ name: 'X', amount: '1 st' }], steps: ['Y'] },
         { date: '2026-12-01', title: 'Fel datum', ingredients: [{ name: 'X', amount: '1 st' }], steps: ['Y'] },
         { date: '2026-11-11', title: 'Tom', ingredients: [] },
@@ -24,7 +24,7 @@ describe('veckomeny', () => {
     })
     const plan = parseMealPlan(text, ['2026-11-10', '2026-11-11'], 2)
     expect(plan.map((d) => d.title)).toEqual(['Pasta carbonara'])
-    expect(plan[0]).toMatchObject({ id: '2026-11-10', portions: 2, nutrition: { kcal: 600 } })
+    expect(plan[0]).toMatchObject({ id: '2026-11-10', portions: 2 })
     expect(() => parseMealPlan('inte json', ['2026-11-10'], 2)).toThrow(/tolka/)
   })
 
@@ -47,7 +47,7 @@ describe('veckomeny', () => {
       sent = String(init.body)
       return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ days: [{ date: '2026-11-10', title: 'Chili con carne', ingredients: [{ name: 'Köttfärs', amount: '500 g' }], steps: ['Bryn'] }] }) } }] }), { status: 200 })
     }) as typeof fetch
-    const plan = await fetchMealPlan({ days: [dayContext('2026-11-10', food)], pantry, food: { allergies: '', portions: 4 }, goals: { proteinG: 120, carbsG: 250, fatG: 70, waterMl: 2000, glassMl: 250 }, memories: ['Gillar inte svamp'], recent: [], today: '2026-11-10' }, 'gpt-4o-mini', {}, fetchFn)
+    const plan = await fetchMealPlan({ days: [dayContext('2026-11-10', food)], pantry, food: { allergies: '', portions: 4 }, memories: ['Gillar inte svamp'], recent: [], today: '2026-11-10' }, 'gpt-4o-mini', {}, fetchFn)
     expect(plan[0]).toMatchObject({ title: 'Chili con carne', portions: 4 })
     expect(sent).toContain('Gillar inte svamp')
     expect(JSON.parse(sent).response_format).toEqual({ type: 'json_object' })

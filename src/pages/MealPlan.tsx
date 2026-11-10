@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom'
 import { dayContext, fetchMealPlan, missingForPlan, planStart } from '../ai/mealPlan'
 import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
-import { MealForm } from '../components/MealForm'
 import { db } from '../db/db'
 import { addShoppingItems, getSettings, saveSettings } from '../db/repo'
 import { WEEKDAYS_SHORT, addDays, dayLabel, toHHmm, toISODate } from '../domain/dates'
@@ -27,7 +26,6 @@ export function MealPlanTab() {
   const [days, setDays] = useState(7)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [eating, setEating] = useState<PlannedDinner | null>(null)
   const [finding, setFinding] = useState<Set<string>>(new Set())
   const [notFound, setNotFound] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
@@ -71,7 +69,7 @@ export function MealPlanTab() {
       const recent = plan!.filter((d) => d.date < from && d.date >= addDays(from, -14)).map((d) => d.title)
       const usable = pantry!.filter((p) => !p.expires || p.expires >= today)
       const result = await fetchMealPlan(
-        { days: dates.map((d) => dayContext(d, s.food)), pantry: usable, food: s.food, goals: s.nutrition, memories: s.memories, recent, today },
+        { days: dates.map((d) => dayContext(d, s.food)), pantry: usable, food: s.food, memories: s.memories, recent, today },
         config?.model ?? 'gpt-4o-mini',
         await authHeaders(),
       )
@@ -144,7 +142,7 @@ export function MealPlanTab() {
             <div className="title">{d.title}</div>
             {d.reason && <div className="sub">{d.reason}</div>}
             <div className="sub num">
-              {[d.minutes !== null ? `${d.minutes} min` : null, d.nutrition ? `${d.nutrition.kcal} kcal, protein ${d.nutrition.protein} g per portion` : null, lacking ? `${lacking} saknas` : 'allt finns hemma'].filter(Boolean).join(' · ')}
+              {[d.minutes !== null ? `${d.minutes} min` : null, lacking ? `${lacking} saknas` : 'allt finns hemma'].filter(Boolean).join(' · ')}
             </div>
             {d.url ? (
               <div className="sub">Recept från {d.site}</div>
@@ -164,16 +162,12 @@ export function MealPlanTab() {
               ) : (
                 <button type="button" className="btn primary" disabled={finding.has(d.id)} onClick={async () => findRecipe(d, await authHeaders())}>Hitta recept</button>
               )}
-              <button type="button" className="btn" onClick={() => setEating(d)}>Jag åt detta</button>
               <a className="btn text" href={recipeSearchUrl(d.title)} target="_blank" rel="noreferrer">Fler recept</a>
               <button type="button" className="btn text" onClick={() => undoable(`${d.title} är borttagen ur menyn`, ['mealPlan'], () => db.mealPlan.delete(d.id))}>Ta bort</button>
             </div>
           </section>
         )
       })}
-      {eating && (
-        <MealForm key={eating.id} meal={null} date={today} draft={{ name: eating.title, source: 'recipe', ...(eating.nutrition ?? {}) }} onClose={() => setEating(null)} />
-      )}
     </>
   )
 }

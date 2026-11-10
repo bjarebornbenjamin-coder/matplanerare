@@ -173,6 +173,38 @@ function BackgroundSection() {
   )
 }
 
+function WaterSection() {
+  const settings = useSettings()
+  const [draft, setDraft] = useState<{ waterMl?: string; glassMl?: string }>({})
+  if (!settings) return null
+  const n = settings.nutrition
+  const field = (key: 'waterMl' | 'glassMl', label: string, min: number, max: number) => (
+    <label className="field">
+      <span>{label} (ml)</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={draft[key] ?? String(n[key])}
+        onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+        onBlur={() => {
+          const v = Math.round(Number((draft[key] ?? '').replace(',', '.')))
+          setDraft((d) => ({ ...d, [key]: undefined }))
+          if (draft[key] !== undefined && Number.isFinite(v) && v >= min && v <= max) void saveSettings({ nutrition: { ...n, [key]: v } })
+        }}
+      />
+    </label>
+  )
+  return (
+    <>
+      <p className="muted">Fyll på glas direkt på startsidan.</p>
+      <div className="two">
+        {field('waterMl', 'Mål per dag', 0, 20000)}
+        {field('glassMl', 'Ett glas', 50, 2000)}
+      </div>
+    </>
+  )
+}
+
 function MemorySection() {
   const settings = useSettings()
   const [fact, setFact] = useState('')
@@ -256,6 +288,7 @@ export function SettingsPage() {
         </>
       ),
     },
+    vatten: { title: 'Vatten', body: <WaterSection /> },
     synk: { title: 'Synk mellan enheter', body: <SyncSection /> },
     notiser: { title: 'Notiser', body: <NotifySection /> },
     ai: { title: 'AI-assistent', body: <AiSection /> },
@@ -293,6 +326,7 @@ export function SettingsPage() {
       title: 'Allmänt',
       rows: [
         { to: 'utseende', title: 'Utseende', status: `${theme}${background?.image ? ', egen bakgrundsbild' : ''}` },
+        { to: 'vatten', title: 'Vatten', status: `Mål ${(settings.nutrition.waterMl / 1000).toLocaleString('sv-SE')} l, glas ${settings.nutrition.glassMl} ml` },
       ],
     },
     {

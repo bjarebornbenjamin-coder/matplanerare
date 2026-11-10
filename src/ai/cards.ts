@@ -1,8 +1,7 @@
 import { db } from '../db/db'
-import { addPantryItems, addShoppingItems, addWater, deleteShoppingItem, getSettings, newId, saveMeal, savePantryItem, saveSettings, saveShoppingItem } from '../db/repo'
+import { addPantryItems, addShoppingItems, addWater, deleteShoppingItem, getSettings, savePantryItem, saveSettings, saveShoppingItem } from '../db/repo'
 import { parseISODate } from '../domain/dates'
 import { foodKey } from '../domain/food'
-import { mealKcal } from '../domain/nutrition'
 import type { ChatCard } from '../domain/types'
 
 const shortDate = (d: string) => parseISODate(d).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -41,16 +40,6 @@ export function cardView(card: ChatCard): CardView {
       return { kicker: 'Förslag: kom ihåg', title: card.fact, lines: ['Används i framtida svar. Visas och kan tas bort under Inställningar.'], confirmLabel: 'Kom ihåg', doneText: 'Sparat i minnet.' }
     case 'memory_delete':
       return { kicker: 'Förslag: glöm', title: card.fact, lines: [], confirmLabel: 'Glöm', doneText: 'Borttaget ur minnet.', danger: true }
-    case 'meal_add': {
-      const m = card.meal
-      return {
-        kicker: 'Förslag: logga måltid (uppskattning)',
-        title: m.name,
-        lines: [`${dayLabel(m.date)}${m.time ? ` kl ${m.time}` : ''}`, `${mealKcal(m)} kcal · protein ${m.protein} g · kolhydrater ${m.carbs} g · fett ${m.fat} g`],
-        confirmLabel: 'Logga måltiden',
-        doneText: 'Måltiden är loggad. Du kan ändra värdena under Mat → Kost.',
-      }
-    }
     case 'water_add':
       return { kicker: 'Förslag: vatten', title: `+${card.ml} ml vatten`, lines: [dayLabel(card.date)], confirmLabel: 'Lägg till', doneText: 'Vattnet är tillagt.' }
     case 'shopping_add':
@@ -100,9 +89,6 @@ export async function applyCard(card: ChatCard): Promise<'done' | 'missing'> {
       await saveSettings({ memories: s.memories.filter((m) => m !== card.fact) })
       return 'done'
     }
-    case 'meal_add':
-      await saveMeal({ ...card.meal, id: newId(), source: 'ai', updatedAt: '' })
-      return 'done'
     case 'water_add':
       await addWater(card.date, card.ml)
       return 'done'

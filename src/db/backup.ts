@@ -1,5 +1,5 @@
 import { DEFAULT_FOOD, DEFAULT_NUTRITION } from './repo'
-import type { Backup, Meal, PantryItem, PlannedDinner, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import type { Backup, PantryItem, PlannedDinner, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
 const fail = (msg: string): never => {
   throw new Error(`Ogiltig säkerhetskopia: ${msg}`)
@@ -32,9 +32,6 @@ function parseSettings(v: unknown): Settings {
   const nu = isObj(v.nutrition) ? v.nutrition : {}
   const n = (x: unknown, min: number, max: number, d: number) => (typeof x === 'number' && x >= min && x <= max ? Math.round(x) : d)
   const nutrition = {
-    proteinG: n(nu.proteinG, 0, 1000, DEFAULT_NUTRITION.proteinG),
-    carbsG: n(nu.carbsG, 0, 2000, DEFAULT_NUTRITION.carbsG),
-    fatG: n(nu.fatG, 0, 1000, DEFAULT_NUTRITION.fatG),
     waterMl: n(nu.waterMl, 0, 20000, DEFAULT_NUTRITION.waterMl),
     glassMl: n(nu.glassMl, 50, 2000, DEFAULT_NUTRITION.glassMl),
   }
@@ -71,46 +68,19 @@ function parseShopping(v: unknown): ShoppingItem {
   }
 }
 
-const grams = (v: unknown, max: number): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max ? Math.round(v * 10) / 10 : null)
-
-function parseMeal(v: unknown): Meal {
-  if (!isObj(v) || !isStr(v.id) || !isStr(v.name) || !v.name.trim() || !isDate(v.date)) return fail('måltid')
-  const protein = grams(v.protein, 1000)
-  const carbs = grams(v.carbs, 2000)
-  const fat = grams(v.fat, 1000)
-  if (protein === null || carbs === null || fat === null) return fail('måltidens näringsvärden')
-  const kcal = v.kcal === undefined ? null : grams(v.kcal, 10000)
-  if (v.kcal !== undefined && kcal === null) fail('måltidens kalorier')
-  if (v.time !== undefined && !isTime(v.time)) fail('måltidens tid')
-  return {
-    id: v.id,
-    date: v.date as string,
-    ...(v.time !== undefined ? { time: v.time as string } : {}),
-    name: v.name,
-    ...(kcal !== null ? { kcal } : {}),
-    protein,
-    carbs,
-    fat,
-    source: v.source === 'ai' || v.source === 'recipe' ? v.source : 'manual',
-    updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
-  }
-}
+const num = (v: unknown, min: number, max: number): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined)
 
 function parseWater(v: unknown): WaterDay {
   if (!isObj(v) || !isDate(v.date) || v.id !== v.date) return fail('vattenrad')
-  const ml = grams(v.ml, 20000)
-  if (ml === null) return fail('vattenmängd')
+  const ml = num(v.ml, 0, 20000)
+  if (ml === undefined) return fail('vattenmängd')
   return { id: v.date as string, date: v.date as string, ml: Math.round(ml), updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString() }
 }
-
-const num = (v: unknown, min: number, max: number): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined)
 
 function parseDinner(v: unknown): PlannedDinner {
   if (!isObj(v) || !isDate(v.date) || v.id !== v.date || !isStr(v.title) || !v.title.trim()) return fail('middag i veckomenyn')
   const ingredients = (Array.isArray(v.ingredients) ? v.ingredients : []).filter(isObj).filter((i) => isStr(i.name) && i.name.trim()).map((i) => ({ name: (i.name as string).slice(0, 60), amount: isStr(i.amount) ? i.amount.slice(0, 30) : '' })).slice(0, 30)
   const steps = (Array.isArray(v.steps) ? v.steps : []).filter(isStr).map((s) => s.slice(0, 500)).slice(0, 14)
-  const n = isObj(v.nutrition) ? v.nutrition : null
-  const nutrition = n && [n.kcal, n.protein, n.carbs, n.fat].every((x) => num(x, 0, 5000) !== undefined) ? { kcal: n.kcal as number, protein: n.protein as number, carbs: n.carbs as number, fat: n.fat as number } : undefined
   const minutes = num(v.minutes, 0, 600)
   return {
     id: v.date as string,
@@ -121,7 +91,6 @@ function parseDinner(v: unknown): PlannedDinner {
     minutes: minutes ?? null,
     ingredients,
     steps,
-    ...(nutrition ? { nutrition } : {}),
     ...(isStr(v.url) && v.url.startsWith('https://') ? { url: v.url.slice(0, 500), ...(isStr(v.site) ? { site: v.site.slice(0, 60) } : {}) } : {}),
     updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
   }
@@ -138,7 +107,6 @@ export function parseBackup(json: unknown): Backup {
     settings: json.settings == null ? null : parseSettings(json.settings),
     pantry: list(json.pantry, parsePantry),
     shopping: list(json.shopping, parseShopping),
-    meals: list(json.meals, parseMeal),
     water: list(json.water, parseWater),
     mealPlan: list(json.mealPlan, parseDinner),
   }

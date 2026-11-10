@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react'
 import { AiProgress } from '../components/AiProgress'
 import { DoneButton } from '../components/DoneButton'
 import { Link } from 'react-router-dom'
-import { MealForm } from '../components/MealForm'
 import { PantryForm } from '../components/PantryForm'
 import { MODE_LABELS, findRecipes, ingredientStatuses, type FoundRecipe, type IngredientLine, type RecipeMode } from '../ai/recipeSearch'
 import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, runOut, saveSettings, saveShoppingItem } from '../db/repo'
@@ -155,7 +154,6 @@ export function RecipesTab() {
   const [error, setError] = useState('')
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [allergies, setAllergies] = useState<string | null>(null)
-  const [eating, setEating] = useState<FoundRecipe | null>(null)
   if (!pantry || !settings) return null
   const food = settings.food
   const usable = pantry.filter((p) => !p.expires || p.expires >= today)
@@ -266,14 +264,10 @@ export function RecipesTab() {
               </ul>
               <p className="sub">Jämförelsen med lagret går på namn, så kolla mängderna själv.</p>
             </details>
-            <div className="actions" style={{ marginTop: 4 }}>
-              <button type="button" className="btn text" onClick={() => setEating(r)}>Jag åt detta</button>
-            </div>
             {notes[r.url] && <p className="muted" role="status">{notes[r.url]}</p>}
           </div>
         )
       })}
-      {eating && <MealForm key={eating.url} meal={null} date={today} draft={{ name: eating.title, source: 'recipe' }} onClose={() => setEating(null)} />}
     </>
   )
 }

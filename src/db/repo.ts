@@ -1,7 +1,7 @@
 import { DEFAULT_MODEL } from '../ai/models'
 import { toISODate } from '../domain/dates'
 import { foodKey } from '../domain/food'
-import type { AiConfig, Backup, ChatMessage, FoodSettings, Meal, NutritionSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
+import type { AiConfig, Backup, ChatMessage, FoodSettings, NutritionSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
 import { db } from './db'
 
 export const newId = () => crypto.randomUUID()
@@ -15,7 +15,7 @@ export const DEFAULT_FOOD: FoodSettings = {
   expiry: { enabled: true, time: '08:00' },
 }
 
-export const DEFAULT_NUTRITION: NutritionSettings = { proteinG: 120, carbsG: 250, fatG: 70, waterMl: 2000, glassMl: 250 }
+export const DEFAULT_NUTRITION: NutritionSettings = { waterMl: 2000, glassMl: 250 }
 
 export async function getAiConfig(): Promise<AiConfig> {
   return (await db.aiConfig.get('main')) ?? { id: 'main', password: '', model: DEFAULT_MODEL }
@@ -161,14 +161,6 @@ export async function runOut(pantryId: string, addToList: boolean): Promise<void
   await db.pantry.delete(pantryId)
 }
 
-export async function saveMeal(meal: Meal): Promise<void> {
-  await db.meals.put({ ...meal, updatedAt: new Date().toISOString() })
-}
-
-export async function deleteMeal(id: string): Promise<void> {
-  await db.meals.delete(id)
-}
-
 export async function addWater(date: string, deltaMl: number): Promise<number> {
   return db.transaction('rw', db.water, async () => {
     const current = (await db.water.get(date))?.ml ?? 0
@@ -214,7 +206,6 @@ export async function exportAll(): Promise<Backup> {
     settings: (await db.settings.get('main')) ?? null,
     pantry: await db.pantry.toArray(),
     shopping: await db.shopping.toArray(),
-    meals: await db.meals.toArray(),
     water: await db.water.toArray(),
     mealPlan: await db.mealPlan.toArray(),
   }
@@ -222,12 +213,11 @@ export async function exportAll(): Promise<Backup> {
 
 /** Ersätter all data med innehållet i säkerhetskopian. */
 export async function importAll(backup: Backup): Promise<void> {
-  await db.transaction('rw', [db.settings, db.pantry, db.shopping, db.meals, db.water, db.mealPlan], async () => {
-    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.meals.clear(), db.water.clear(), db.mealPlan.clear()])
+  await db.transaction('rw', [db.settings, db.pantry, db.shopping, db.water, db.mealPlan], async () => {
+    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear()])
     if (backup.settings) await db.settings.put(backup.settings)
     await db.pantry.bulkPut(backup.pantry)
     await db.shopping.bulkPut(backup.shopping)
-    await db.meals.bulkPut(backup.meals)
     await db.water.bulkPut(backup.water)
     await db.mealPlan.bulkPut(backup.mealPlan)
   })

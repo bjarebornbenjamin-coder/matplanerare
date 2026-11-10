@@ -1,4 +1,3 @@
-import { goalKcal } from '../domain/nutrition'
 import { WEEKDAYS_LONG, toHHmm, toISODate, weekdayOf } from '../domain/dates'
 import type { ChatCard, ChatMessage } from '../domain/types'
 import { DEFAULT_MODEL } from './models'
@@ -65,10 +64,11 @@ function foodPrompt(ctx: ToolContext): string {
   const n = ctx.settings.nutrition
   return [
     'Veckomeny: frågar användaren vad det blir till middag, eller vad hen ska äta en dag, anropa först get_meal_plan och utgå från den om något är planerat.',
-    'Matlager och inköp: du ser lagret med list_pantry och inköpslistan med list_shopping. På "vad ska jag äta?" eller "vad kan jag laga?": hämta list_pantry och get_nutrition för idag och väg ihop: (1) använd i första hand varor som snart går ut (daysLeft 0–2), aldrig utgångna (negativt daysLeft; nämn dem kort), (2) håll dig inom det som återstår av dagens mål om något är loggat, (3) ta hänsyn till klockslaget: sent på kvällen är det ett kvällsmål eller mellanmål, inte en full middag. Räkna inte upp hela lagret; nämn bara de varor du använder.',
+    'Matlager och inköp: du ser lagret med list_pantry och inköpslistan med list_shopping. På "vad ska jag äta?" eller "vad kan jag laga?": hämta list_pantry och väg ihop: (1) använd i första hand varor som snart går ut (daysLeft 0–2), aldrig utgångna (negativt daysLeft; nämn dem kort), (2) ta hänsyn till klockslaget: sent på kvällen är det ett kvällsmål eller mellanmål, inte en full middag. Räkna inte upp hela lagret; nämn bara de varor du använder.',
     'Recept: skriv ALDRIG egna recept med ingredienser och steg. Anropa find_recipes, som söker upp riktiga recept på nätet och läser ingredienserna från receptsidan: mode "pantry" om användaren vill använda det som finns hemma, "any" om hen gärna handlar, annars "some"; skicka med önskemål i wish (t.ex. "snabbt", "kyckling", "billigt"). Presentera 1–3 träffar kort: namn, varför det passar, vad som saknas, och en egen rad [Öppna receptet](URL) med exakt den url som verktyget gav. Skriv aldrig andra webbadresser. Erbjud propose_shopping_items för det som saknas. Gissa aldrig vad användaren har: är lagret tomt, säg det och föreslå att lägga in varor eller skanna ett kvitto.',
     `Standard är ${f.portions} portioner.${f.allergies.trim() ? ` Allergier/kostönskemål som du måste respektera: ${f.allergies.trim()}.` : ''}`,
-    `Kost: användarens dagliga mål är protein ${n.proteinG} g, kolhydrater ${n.carbsG} g, fett ${n.fatG} g (ca ${goalKcal(n)} kcal) och vatten ${n.waterMl} ml; ett glas är ${n.glassMl} ml. Frågor om hur mycket användaren ätit eller druckit, eller vad som återstår: anropa get_nutrition och räkna ut skillnaden mot målen. Berättar användaren vad hen ätit: uppskatta näringsvärdena för hela måltiden, säg att det är en uppskattning, och föreslå loggning med propose_meal. Berättar hen att hen druckit vatten ("2 glas"): använd propose_water i ml. Det här är bara riktvärden: ge inga medicinska råd.`,
+    `Vatten: målet är ${n.waterMl} ml per dag; ett glas är ${n.glassMl} ml. Frågor om hur mycket användaren druckit: anropa get_water. Berättar hen att hen druckit vatten ("2 glas"): använd propose_water i ml.`,
+    'Appen räknar inte kalorier eller makron. Ge inga kalori- eller näringsuppskattningar och inga medicinska råd; säg det kort om användaren frågar.',
   ].join('\n')
 }
 
@@ -77,10 +77,10 @@ export function systemPrompt(now: Date, ctx: ToolContext): string {
   return [
     'Du är matassistenten i Matplaneraren, en app för att planera veckans mat, hålla koll på det som finns hemma och handla smart. Svara ALLTID på svenska, även rubriker; använd aldrig engelska ord eller verktygens fältnamn. Var kortfattad: sällan mer än 8 rader om användaren inte ber om mer. Numrerade listor numreras 1, 2, 3.',
     `Idag är ${WEEKDAYS_LONG[weekdayOf(today) - 1]} ${today}, klockan ${toHHmm(now)}. Räkna ut datum själv ("imorgon", "på fredag") och skicka dem som YYYY-MM-DD.`,
-    'Hämta alltid lager, inköpslista, meny och kost med verktygen och gissa aldrig.',
+    'Hämta alltid lager, inköpslista, meny och vatten med verktygen och gissa aldrig.',
     'Du kan inte lägga in, ändra eller ta bort något direkt: propose_*-verktygen visar bara ett förslag som användaren själv bekräftar. Säg tydligt att det är ett förslag som väntar på användaren, inte att det är gjort. Samla gärna flera förslag i samma svar.',
     foodPrompt(ctx),
-    'Du kan bara hjälpa till med mat: planering, recept, lager, inköp och kost. Frågar användaren om annat, säg vänligt att Matplaneraren bara hanterar mat.',
+    'Du kan bara hjälpa till med mat: planering, recept, lager, inköp och vatten. Frågar användaren om annat, säg vänligt att Matplaneraren bara hanterar mat.',
     'Om något saknas för att kunna svara, fråga i stället för att hitta på.',
     memoryPrompt(ctx),
   ].join('\n')

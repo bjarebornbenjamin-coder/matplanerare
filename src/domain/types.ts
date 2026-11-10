@@ -17,10 +17,8 @@ export interface FoodSettings {
   expiry: { enabled: boolean; time: HHmm }
 }
 
+/** Vattenmål. Fältet heter nutrition av historiska skäl (synkas med samma namn). */
 export interface NutritionSettings {
-  proteinG: number
-  carbsG: number
-  fatG: number
   waterMl: number
   /** Storlek på ett glas vatten för snabbknappen. */
   glassMl: number
@@ -57,20 +55,6 @@ export interface ShoppingItem {
   updatedAt: string
 }
 
-export interface Meal {
-  id: string
-  date: ISODate
-  time?: HHmm
-  name: string
-  /** Utelämnas = beräknas från makron (4/4/9 kcal per gram). */
-  kcal?: number
-  protein: number
-  carbs: number
-  fat: number
-  source: 'manual' | 'ai' | 'recipe'
-  updatedAt: string
-}
-
 /** Dagens vatten. id = datum, så en rad per dag. */
 export interface WaterDay {
   id: ISODate
@@ -93,8 +77,6 @@ export interface PlannedDinner {
   /** Riktigt recept från nätet; då är ingredienserna receptsidans. */
   url?: string
   site?: string
-  /** Uppskattat per portion. */
-  nutrition?: { kcal: number; protein: number; carbs: number; fat: number }
   updatedAt: string
 }
 
@@ -114,7 +96,6 @@ export type ChatCard =
   | { type: 'prefs_update'; food: Partial<Pick<FoodSettings, 'allergies' | 'portions'>>; nutrition: Partial<NutritionSettings>; summary: string[] }
   | { type: 'memory_add'; fact: string }
   | { type: 'memory_delete'; fact: string }
-  | { type: 'meal_add'; meal: Pick<Meal, 'date' | 'name' | 'protein' | 'carbs' | 'fat'> & Partial<Pick<Meal, 'time' | 'kcal'>> }
   | { type: 'water_add'; date: ISODate; ml: number }
   | { type: 'shopping_add'; items: { name: string; amount?: string }[] }
   | { type: 'pantry_add'; items: { name: string; amount?: string; expires?: ISODate }[] }
@@ -137,7 +118,6 @@ export interface Backup {
   settings: Settings | null
   pantry: PantryItem[]
   shopping: ShoppingItem[]
-  meals: Meal[]
   water: WaterDay[]
   mealPlan: PlannedDinner[]
 }
