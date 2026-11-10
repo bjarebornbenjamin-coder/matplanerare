@@ -100,11 +100,7 @@ export function MealPlanTab() {
 
   return (
     <>
-      <p className="muted">
-        Middagar för de kommande dagarna, utifrån lagret, dina mål och hur dagarna ser ut (snabbt när du har mycket, proteinrikt när du tränar). AI-genererat: kolla allergier.
-      </p>
-      <WeekdayPicker label="Kort om tid (snabba middagar)" days={settings.food.quickWeekdays} onChange={(quickWeekdays) => saveSettings({ food: { ...settings.food, quickWeekdays } })} />
-      <WeekdayPicker label="Träningsdagar (proteinrikt)" days={settings.food.trainingWeekdays} onChange={(trainingWeekdays) => saveSettings({ food: { ...settings.food, trainingWeekdays } })} />
+      <h2>Planera</h2>
       <div className="actions" style={{ marginTop: 8 }}>
         <label className="inline-field">
           <span>Dagar</span>
@@ -116,6 +112,12 @@ export function MealPlanTab() {
           {busy ? 'Planerar… (kan ta en halv minut)' : upcoming.length ? 'Gör ny meny' : 'Gör veckomeny'}
         </button>
       </div>
+      <details className="plan-options">
+        <summary>Anpassa veckan</summary>
+        <WeekdayPicker label="Kort om tid (snabba middagar)" days={settings.food.quickWeekdays} onChange={(quickWeekdays) => saveSettings({ food: { ...settings.food, quickWeekdays } })} />
+        <WeekdayPicker label="Träningsdagar (proteinrikt)" days={settings.food.trainingWeekdays} onChange={(trainingWeekdays) => saveSettings({ food: { ...settings.food, trainingWeekdays } })} />
+        <p className="footnote">AI:n väljer rätterna utifrån lagret, dina mål och de här dagarna. Kolla allergier.</p>
+      </details>
       <AiProgress active={busy} expected={30} label="Planerar middagarna" />
       {error && (
         <>
@@ -131,12 +133,13 @@ export function MealPlanTab() {
       )}
       {message && <p className="muted" role="status">{message}</p>}
 
-      {upcoming.length === 0 && !busy && <p className="empty">Ingen meny än.</p>}
+      {upcoming.length > 0 && <h2>Alla middagar</h2>}
+      {upcoming.length === 0 && !busy && <p className="empty">Ingen meny än. Tryck Gör veckomeny.</p>}
       {upcoming.map((d) => {
         const ingredients = withPantryStatus(d.ingredients, pantry)
         const lacking = ingredients.filter((i) => i.status === 'missing').length
         return (
-          <section key={d.id} className="card recipe" aria-label={`${dayLabel(d.date)}: ${d.title}`}>
+          <section key={d.id} id={`middag-${d.date}`} className="card recipe" aria-label={`${dayLabel(d.date)}: ${d.title}`}>
             <div className="sub">{d.date === today ? 'Idag' : d.date === addDays(today, 1) ? 'Imorgon' : dayLabel(d.date)}</div>
             <div className="title">{d.title}</div>
             {d.reason && <div className="sub">{d.reason}</div>}
