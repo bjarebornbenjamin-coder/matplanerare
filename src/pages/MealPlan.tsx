@@ -7,7 +7,7 @@ import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
 import { addShoppingItems, getSettings, saveSettings } from '../db/repo'
-import { WEEKDAYS_SHORT, addDays, dayLabel, toHHmm, toISODate } from '../domain/dates'
+import { WEEKDAYS_SHORT, addDays, dayLabel, parseISODate, toHHmm, toISODate, weekdayOf } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
 import { recipeSearchUrl } from '../domain/recipeLink'
 import { findRecipes, splitIngredient } from '../ai/recipeSearch'
@@ -29,6 +29,7 @@ export function MealPlanTab() {
   const [finding, setFinding] = useState<Set<string>>(new Set())
   const [notFound, setNotFound] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
+  const [openIng, setOpenIng] = useState<Set<string>>(new Set())
   if (!plan || !pantry || !settings) return null
 
   const upcoming = plan.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date))
@@ -136,34 +137,50 @@ export function MealPlanTab() {
       {upcoming.map((d) => {
         const ingredients = withPantryStatus(d.ingredients, pantry)
         const lacking = ingredients.filter((i) => i.status === 'missing').length
+        const open = openIng.has(d.id)
+        const isToday = d.date === today
         return (
-          <section key={d.id} id={`middag-${d.date}`} className="card recipe" aria-label={`${dayLabel(d.date)}: ${d.title}`}>
-            <div className="sub">{d.date === today ? 'Idag' : d.date === addDays(today, 1) ? 'Imorgon' : dayLabel(d.date)}</div>
-            <div className="title">{d.title}</div>
-            {d.reason && <div className="sub">{d.reason}</div>}
-            <div className="sub num">
-              {[d.minutes !== null ? `${d.minutes} min` : null, lacking ? `${lacking} saknas` : 'allt finns hemma'].filter(Boolean).join(' · ')}
+          <section key={d.id} id={`middag-${d.date}`} className={`dinner${isToday ? ' is-today' : ''}`} aria-label={`${dayLabel(d.date)}: ${d.title}`}>
+            <div className="dinner-head">
+              <div className="dinner-date" aria-hidden="true">
+                <span>{isToday ? 'Idag' : WEEKDAYS_SHORT[weekdayOf(d.date) - 1]}</span>
+                <strong className="num">{parseISODate(d.date).getDate()}</strong>
+              </div>
+              <div className="dinner-headline">
+                <h3 className="dinner-title">{d.title}</h3>
+                {d.reason && <p className="dinner-reason">{d.reason}</p>}
+              </div>
+              <button type="button" className="icon-btn dinner-remove" aria-label={`Ta bort ${d.title} ur menyn`} onClick={() => undoable(`${d.title} är borttagen ur menyn`, ['mealPlan'], () => db.mealPlan.delete(d.id))}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
+              </button>
             </div>
-            {d.url ? (
-              <div className="sub">Recept från {d.site}</div>
-            ) : finding.has(d.id) ? null : (
-              <p className="sub">{notFound.has(d.id) ? 'Hittade inget recept som gick att läsa.' : 'Inget recept hämtat än.'} Ingredienserna är AI:ns uppskattning.</p>
-            )}
-            <AiProgress active={finding.has(d.id)} expected={20} label="Letar recept på nätet" />
-            <details style={{ marginTop: 8 }}>
-              <summary style={{ cursor: 'pointer', minHeight: 32, display: 'flex', alignItems: 'center', color: 'var(--primary)' }}>
-                {d.url ? 'Ingredienser enligt receptet' : 'Ungefärliga ingredienser'} ({d.ingredients.length})
-              </summary>
-              <IngredientList items={ingredients} expiring={expiring} />
-            </details>
-            <div className="actions" style={{ marginTop: 8 }}>
-              {d.url ? (
-                <a className="btn primary" href={d.url} target="_blank" rel="noreferrer">Öppna receptet</a>
-              ) : (
-                <button type="button" className="btn primary" disabled={finding.has(d.id)} onClick={async () => findRecipe(d, await authHeaders())}>Hitta recept</button>
+            <div className="dinner-main">
+              <div className="dinner-tags">
+                {d.minutes !== null && <span className="tag num">{d.minutes} min</span>}
+                {d.url && <span className="tag">{d.site}</span>}
+                <span className={`tag ${lacking ? 'warn' : 'ok'}`}>{lacking ? `${lacking} saknas` : 'Allt hemma'}</span>
+              </div>
+              {!d.url && !finding.has(d.id) && (
+                <p className="dinner-note">{notFound.has(d.id) ? 'Hittade inget recept som gick att läsa.' : 'Inget recept hämtat än.'} Ingredienserna är AI:ns uppskattning.</p>
               )}
-              <a className="btn text" href={recipeSearchUrl(d.title)} target="_blank" rel="noreferrer">Fler recept</a>
-              <button type="button" className="btn text" onClick={() => undoable(`${d.title} är borttagen ur menyn`, ['mealPlan'], () => db.mealPlan.delete(d.id))}>Ta bort</button>
+              <AiProgress active={finding.has(d.id)} expected={20} label="Letar recept på nätet" />
+              <div className="dinner-actions">
+                {d.url ? (
+                  <a className="btn primary" href={d.url} target="_blank" rel="noreferrer">Öppna receptet</a>
+                ) : (
+                  <button type="button" className="btn primary" disabled={finding.has(d.id)} onClick={async () => findRecipe(d, await authHeaders())}>Hitta recept</button>
+                )}
+                <button type="button" className="btn" aria-expanded={open} onClick={() => setOpenIng((s) => { const n = new Set(s); if (open) n.delete(d.id); else n.add(d.id); return n })}>
+                  Ingredienser <span className="num">{d.ingredients.length}</span> <svg className={`caret${open ? ' up' : ''}`} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                </button>
+              </div>
+              {open && (
+                <div className="dinner-ingredients">
+                  <div className="sub">{d.url ? 'Enligt receptet' : 'Ungefärliga, enligt AI:n'}</div>
+                  <IngredientList items={ingredients} expiring={expiring} />
+                  <a className="btn text" href={recipeSearchUrl(d.title)} target="_blank" rel="noreferrer">Fler recept på nätet</a>
+                </div>
+              )}
             </div>
           </section>
         )
