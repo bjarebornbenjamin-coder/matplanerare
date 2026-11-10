@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOX_DAYS, MEAL_PLAN_PROMPT, boxSides, dayContext, fetchMealPlan, mealPlanUserContent, parseSides, planDays, missingForPlan, parseMealPlan, planStart } from './mealPlan'
+import { BOX_DAYS, INSPIRATION, MEAL_PLAN_PROMPT, boxSides, fetchVariedMealPlan, pickInspiration, repeats, sameDish, dayContext, fetchMealPlan, mealPlanUserContent, parseSides, planDays, missingForPlan, parseMealPlan, planStart } from './mealPlan'
 import type { PantryItem, PlannedDinner } from '../domain/types'
 
 const food = { quickWeekdays: [2], trainingWeekdays: [3] }
@@ -125,5 +125,51 @@ describe('frukost, lunch och storkok', () => {
     const user = JSON.parse(JSON.parse(sent).messages[1].content)
     expect(user.days[0]).toMatchObject({ portions: 3, batchBoxes: 1 })
     expect(user.basePortions).toBe(2)
+  })
+})
+
+describe('variation', () => {
+  it('känner igen samma eller nästan samma rätt', () => {
+    expect(sameDish('Kycklinggryta med ris', 'kycklinggryta med curry')).toBe(true)
+    expect(sameDish('Pasta carbonara', 'Pasta Carbonara!')).toBe(true)
+    expect(sameDish('Tacos', 'Fisktacos')).toBe(true)
+    expect(sameDish('Pasta carbonara', 'Pasta pesto')).toBe(false)
+    expect(sameDish('Kycklingwok', 'Kycklinggryta')).toBe(false)
+    expect(repeats(['Tacos', 'Laxpasta', 'Pyttipanna'], ['tacos', 'Pyttipanna med ägg'])).toBe(2)
+  })
+
+  it('slumpar tre olika inspirationer', () => {
+    const picked = pickInspiration(() => 0)
+    expect(picked).toEqual(INSPIRATION.slice(0, 3))
+    expect(new Set(pickInspiration()).size).toBe(3)
+  })
+
+  it('skickar med de ersatta rätterna, och frågar igen om svaret är för likt', async () => {
+    const answers = [['Kycklinggryta med ris', 'Tacos'], ['Thaicurry med räkor', 'Grekisk moussaka']]
+    const sent: { replacing: string[]; inspiration: string[] }[] = []
+    const fetchFn = (async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(JSON.parse(String(init.body)).messages[1].content))
+      const titles = answers[sent.length - 1]
+      const content = JSON.stringify({ days: ['2026-11-10', '2026-11-11'].map((date, i) => ({ date, title: titles[i], ingredients: [{ name: 'X', amount: '1 st' }] })) })
+      return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+    }) as typeof fetch
+    const days = [dayContext('2026-11-10', food), dayContext('2026-11-11', food)]
+    const r = await fetchVariedMealPlan({ days, pantry, food: { allergies: '', portions: 2 }, memories: [], recent: [], replacing: ['Kycklinggryta med curry', 'Tacos'], today: '2026-11-10' }, 'm', {}, fetchFn, () => 0.5)
+    expect(sent).toHaveLength(2)
+    expect(sent[0].replacing).toEqual(['Kycklinggryta med curry', 'Tacos'])
+    expect(sent[0].inspiration).toHaveLength(3)
+    expect(sent[1].replacing).toContain('Kycklinggryta med ris')
+    expect(r.dinners.map((d) => d.title)).toEqual(['Thaicurry med räkor', 'Grekisk moussaka'])
+  })
+
+  it('frågar bara en gång när svaret är nytt', async () => {
+    let calls = 0
+    const fetchFn = (async () => {
+      calls++
+      const content = JSON.stringify({ days: [{ date: '2026-11-10', title: 'Fiskgratäng', ingredients: [{ name: 'Torsk', amount: '400 g' }] }] })
+      return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+    }) as typeof fetch
+    await fetchVariedMealPlan({ days: [dayContext('2026-11-10', food)], pantry, food: { allergies: '', portions: 2 }, memories: [], recent: ['Tacos'], replacing: ['Pasta carbonara'], today: '2026-11-10' }, 'm', {}, fetchFn)
+    expect(calls).toBe(1)
   })
 })

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AiProgress } from '../components/AiProgress'
 import { DoneButton } from '../components/DoneButton'
 import { Link } from 'react-router-dom'
-import { boxSides, fetchMealPlan, missingForPlan, planDays, planStart } from '../ai/mealPlan'
+import { boxSides, fetchVariedMealPlan, missingForPlan, planDays, planStart } from '../ai/mealPlan'
 import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
@@ -76,11 +76,12 @@ export function MealPlanTab() {
       const s = { ...stored, food: { ...stored.food, weekWishes: (wishes ?? stored.food.weekWishes ?? '').trim() } }
       const from = planStart(today, toHHmm(now))
       const dates = Array.from({ length: days }, (_, i) => addDays(from, i))
-      const recent = plan!.filter((d) => d.date < from && d.date >= addDays(from, -14)).map((d) => d.title)
+      const recent = plan!.filter((d) => d.date < from && d.date >= addDays(from, -21)).map((d) => d.title)
+      const replacing = plan!.filter((d) => dates.includes(d.date)).map((d) => d.title)
       const usable = pantry!.filter((p) => !p.expires || p.expires >= today)
       const planned = planDays(dates, s.food)
-      const { dinners, sides: aiSides } = await fetchMealPlan(
-        { days: planned.days, pantry: usable, food: s.food, memories: s.memories, recent, today },
+      const { dinners, sides: aiSides } = await fetchVariedMealPlan(
+        { days: planned.days, pantry: usable, food: s.food, memories: s.memories, recent, replacing, today },
         config?.model ?? 'gpt-4o-mini',
         await authHeaders(),
       )
