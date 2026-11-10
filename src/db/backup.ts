@@ -1,5 +1,5 @@
 import { DEFAULT_FOOD, DEFAULT_NUTRITION } from './repo'
-import type { Backup, PantryItem, PlannedDinner, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import type { Backup, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
 const fail = (msg: string): never => {
   throw new Error(`Ogiltig säkerhetskopia: ${msg}`)
@@ -22,6 +22,10 @@ function parseSettings(v: unknown): Settings {
     portions: typeof f.portions === 'number' && f.portions >= 1 && f.portions <= 12 ? Math.round(f.portions) : DEFAULT_FOOD.portions,
     quickWeekdays: weekdays(f.quickWeekdays),
     trainingWeekdays: weekdays(f.trainingWeekdays),
+    breakfastWeekdays: weekdays(f.breakfastWeekdays),
+    lunchWeekdays: weekdays(f.lunchWeekdays),
+    batchWeekdays: weekdays(f.batchWeekdays),
+    boxPortions: typeof f.boxPortions === 'number' && f.boxPortions >= 1 && f.boxPortions <= 8 ? Math.round(f.boxPortions) : DEFAULT_FOOD.boxPortions,
     weekWishes: isStr(f.weekWishes) ? f.weekWishes.slice(0, 500) : '',
     shopping: {
       enabled: typeof sh.enabled === 'boolean' ? sh.enabled : DEFAULT_FOOD.shopping.enabled,
@@ -92,7 +96,25 @@ function parseDinner(v: unknown): PlannedDinner {
     minutes: minutes ?? null,
     ingredients,
     steps,
+    ...(num(v.boxes, 1, 30) !== undefined ? { boxes: Math.round(v.boxes as number) } : {}),
     ...(isStr(v.url) && v.url.startsWith('https://') ? { url: v.url.slice(0, 500), ...(isStr(v.site) ? { site: v.site.slice(0, 60) } : {}) } : {}),
+    updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
+  }
+}
+
+function parseSide(v: unknown): PlannedSide {
+  const slot = isObj(v) && (v.slot === 'breakfast' || v.slot === 'lunch') ? v.slot : null
+  if (!isObj(v) || !slot || !isDate(v.date) || v.id !== `${v.date as string}:${slot}` || !isStr(v.title) || !v.title.trim()) return fail('frukost eller lunch i veckomenyn')
+  const ingredients = (Array.isArray(v.ingredients) ? v.ingredients : []).filter(isObj).filter((i) => isStr(i.name) && i.name.trim()).map((i) => ({ name: (i.name as string).slice(0, 60), amount: isStr(i.amount) ? i.amount.slice(0, 30) : '' })).slice(0, 30)
+  return {
+    id: v.id as string,
+    date: v.date as string,
+    slot,
+    title: v.title.slice(0, 100),
+    portions: num(v.portions, 1, 24) ?? 1,
+    minutes: num(v.minutes, 0, 600) ?? null,
+    ingredients,
+    ...(isDate(v.fromBatch) ? { fromBatch: v.fromBatch as string } : {}),
     updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
   }
 }
@@ -110,5 +132,6 @@ export function parseBackup(json: unknown): Backup {
     shopping: list(json.shopping, parseShopping),
     water: list(json.water, parseWater),
     mealPlan: list(json.mealPlan, parseDinner),
+    sides: list(json.sides, parseSide),
   }
 }

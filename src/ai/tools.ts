@@ -1,6 +1,6 @@
 import { addDays, daysBetween, toISODate } from '../domain/dates'
 import { daysLeft, foodKey } from '../domain/food'
-import type { ChatCard, PantryItem, PlannedDinner, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import type { ChatCard, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
 /** Det chatten kan läsa. */
 export interface ToolContext {
@@ -9,6 +9,8 @@ export interface ToolContext {
   shopping: ShoppingItem[]
   water: WaterDay[]
   mealPlan: PlannedDinner[]
+  /** Frukost och lunch i veckomenyn. */
+  sides?: PlannedSide[]
   /** Dagens datum (sätts av chatten så att svaren följer appens klocka). */
   today?: string
   /** Klockslaget nu, HH:mm. */
@@ -124,7 +126,7 @@ export const TOOL_DEFINITIONS = [
   },
 {
     name: 'get_meal_plan',
-    description: 'Veckomenyn: planerade middagar från och med ett datum (standard idag), med ingredienser och steg. Användaren gör menyn under Mat → Meny.',
+    description: 'Veckomenyn: planerade middagar (och frukost/lunch/matlådor om sådana planerats) från och med ett datum (standard idag), med ingredienser och steg. Användaren gör menyn under Mat → Meny.',
     parameters: { type: 'object', properties: { from: date, days: { type: 'integer', description: '1–14, standard 7' } } },
   },
 {
@@ -256,7 +258,8 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
       const list = ctx.mealPlan.filter((d) => d.date >= from && d.date <= to).sort((a, b) => a.date.localeCompare(b.date))
       return {
         result: {
-          dinners: list.map((d) => ({ date: d.date, title: d.title, reason: d.reason || undefined, minutes: d.minutes ?? undefined, portions: d.portions, ingredients: d.ingredients, steps: d.steps })),
+          dinners: list.map((d) => ({ date: d.date, title: d.title, reason: d.reason || undefined, minutes: d.minutes ?? undefined, portions: d.portions, ...(d.boxes ? { batchCookBoxes: d.boxes } : {}), ingredients: d.ingredients, steps: d.steps })),
+          breakfastsAndLunches: (ctx.sides ?? []).filter((x) => x.date >= from && x.date <= to).sort((a, b) => a.id.localeCompare(b.id)).map((x) => ({ date: x.date, meal: x.slot === 'breakfast' ? 'frukost' : 'lunch', title: x.title, ...(x.fromBatch ? { lunchBoxFrom: x.fromBatch } : {}), minutes: x.minutes ?? undefined, ingredients: x.ingredients.length ? x.ingredients : undefined })),
           ...(list.length === 0 ? { note: 'Ingen veckomeny för perioden. Användaren kan göra en under Mat → Meny.' } : {}),
         },
       }

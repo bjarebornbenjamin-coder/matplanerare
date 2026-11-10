@@ -12,6 +12,10 @@ export const DEFAULT_FOOD: FoodSettings = {
   weekWishes: '',
   quickWeekdays: [],
   trainingWeekdays: [],
+  breakfastWeekdays: [],
+  lunchWeekdays: [],
+  batchWeekdays: [],
+  boxPortions: 1,
   shopping: { enabled: true, weekday: 5, time: '16:00' },
   expiry: { enabled: true, time: '08:00' },
 }
@@ -209,17 +213,19 @@ export async function exportAll(): Promise<Backup> {
     shopping: await db.shopping.toArray(),
     water: await db.water.toArray(),
     mealPlan: await db.mealPlan.toArray(),
+    sides: await db.sides.toArray(),
   }
 }
 
 /** Ersätter all data med innehållet i säkerhetskopian. */
 export async function importAll(backup: Backup): Promise<void> {
-  await db.transaction('rw', [db.settings, db.pantry, db.shopping, db.water, db.mealPlan], async () => {
-    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear()])
+  await db.transaction('rw', [db.settings, db.pantry, db.shopping, db.water, db.mealPlan, db.sides], async () => {
+    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear()])
     if (backup.settings) await db.settings.put(backup.settings)
     await db.pantry.bulkPut(backup.pantry)
     await db.shopping.bulkPut(backup.shopping)
     await db.water.bulkPut(backup.water)
     await db.mealPlan.bulkPut(backup.mealPlan)
+    await db.sides.bulkPut(backup.sides)
   })
 }

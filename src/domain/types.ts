@@ -11,6 +11,14 @@ export interface FoodSettings {
   quickWeekdays: number[]
   /** Veckodagar när man tränar: då föreslås proteinrika middagar. */
   trainingWeekdays: number[]
+  /** Veckodagar då frukost planeras. */
+  breakfastWeekdays: number[]
+  /** Veckodagar då lunch planeras (matlåda om det finns ett storkok dagarna före). */
+  lunchWeekdays: number[]
+  /** Veckodagar med storkok: middagen lagas med extra portioner till matlådor. */
+  batchWeekdays: number[]
+  /** Portioner per matlåda-lunch. */
+  boxPortions: number
   /** Önskemål för veckan i fri text, t.ex. "fredag något lyxigt". Skickas med när menyn görs. */
   weekWishes?: string
   /** Notis med inköpslistan en viss veckodag (1 = måndag … 7 = söndag). */
@@ -65,6 +73,25 @@ export interface WaterDay {
   updatedAt: string
 }
 
+export type SideSlot = 'breakfast' | 'lunch'
+
+/**
+ * Frukost eller lunch i veckomenyn. id = `${date}:${slot}`. Ligger i en egen samling
+ * så att middagarna behåller samma form som i Studieassistenten (som delar synken).
+ */
+export interface PlannedSide {
+  id: string
+  date: ISODate
+  slot: SideSlot
+  title: string
+  portions: number
+  minutes: number | null
+  ingredients: { name: string; amount: string }[]
+  /** Matlåda från storkoket det datumet; har inga egna ingredienser. */
+  fromBatch?: ISODate
+  updatedAt: string
+}
+
 /** En middag i veckomenyn. id = datum, så en middag per dag. */
 export interface PlannedDinner {
   id: ISODate
@@ -76,6 +103,8 @@ export interface PlannedDinner {
   minutes: number | null
   ingredients: { name: string; amount: string }[]
   steps: string[]
+  /** Storkok: antal matlådor som lagas utöver dagens portioner. */
+  boxes?: number
   /** Riktigt recept från nätet; då är ingredienserna receptsidans. */
   url?: string
   site?: string
@@ -122,4 +151,5 @@ export interface Backup {
   shopping: ShoppingItem[]
   water: WaterDay[]
   mealPlan: PlannedDinner[]
+  sides: PlannedSide[]
 }

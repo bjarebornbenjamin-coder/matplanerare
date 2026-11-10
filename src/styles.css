@@ -656,3 +656,18 @@ html { scroll-behavior: smooth; scroll-padding-top: 16px; }
 @media (min-width: 560px) { .dinner-main { padding-left: 66px; } }
 
 .wish-field textarea { min-height: 76px; line-height: 1.4; }
+
+/* Frukost, lunch och matlådor i dagskorten */
+.sides { margin-top: 14px; border-top: 1px solid var(--outline); padding-top: 6px; }
+.side { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; }
+.side-label { flex: 0 0 64px; margin-top: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+.side-body { flex: 1; min-width: 0; padding-top: 9px; }
+.side-title { font-weight: 500; line-height: 1.35; }
+.side-meta { font-size: 13px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.side-meta.warn { color: var(--warn-text); }
+.side .icon-btn { flex: none; }
+.side .dinner-ingredients { margin-top: 8px; }
+.tag.batch { color: var(--on-primary-container, #0b57d0); background: var(--primary-container, #d3e3fd); }
+.muted-title { color: var(--muted); font-weight: 500; }
+h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin: 16px 0 4px; }
+@media (min-width: 560px) { .sides { margin-left: 66px; } }

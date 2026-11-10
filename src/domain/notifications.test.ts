@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { planNotifications } from './notifications'
 
 describe('mat-notiser', () => {
-  const food = { allergies: '', portions: 2, quickWeekdays: [], trainingWeekdays: [], shopping: { enabled: true, weekday: 5, time: '16:00' }, expiry: { enabled: true, time: '08:00' } }
+  const food = { allergies: '', portions: 2, quickWeekdays: [], trainingWeekdays: [], breakfastWeekdays: [], lunchWeekdays: [], batchWeekdays: [], boxPortions: 1, shopping: { enabled: true, weekday: 5, time: '16:00' }, expiry: { enabled: true, time: '08:00' } }
   const settings = { food }
   const item = (name: string, expires?: string) => ({ id: name, name, expires, addedAt: '2026-11-01', source: 'manual' as const, updatedAt: '' })
   const buy = (name: string, done = false) => ({ id: name, name, done, addedAt: '2026-11-01', updatedAt: '' })

@@ -4,7 +4,7 @@ import { db } from './db'
 import { addChatMessage, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
 
 beforeEach(async () => {
-  await Promise.all([db.settings.clear(), db.chat.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear()])
+  await Promise.all([db.settings.clear(), db.chat.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear()])
 })
 
 describe('export och import', () => {
@@ -14,8 +14,9 @@ describe('export och import', () => {
     await db.shopping.put({ id: 's1', name: 'Ägg', done: false, addedAt: '2026-11-08', updatedAt: '' })
     await addWater('2026-11-10', 500)
     await db.mealPlan.put({ id: '2026-11-11', date: '2026-11-11', title: 'Pasta carbonara', reason: '', portions: 2, minutes: 25, ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: [], url: 'https://www.ica.se/recept/x/', site: 'ica.se', updatedAt: '' })
+    await db.sides.put({ id: '2026-11-12:lunch', date: '2026-11-12', slot: 'lunch', title: 'Pasta carbonara', portions: 1, minutes: null, ingredients: [], fromBatch: '2026-11-11', updatedAt: '' })
     const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear()])
+    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear()])
     await importAll(backup)
     const s = await getSettings()
     expect(s.memories).toEqual(['Gillar inte svamp'])
@@ -23,6 +24,7 @@ describe('export och import', () => {
     expect((await db.pantry.get('p1'))?.expires).toBe('2026-11-12')
     expect((await db.shopping.get('s1'))?.name).toBe('Ägg')
     expect((await db.water.get('2026-11-10'))?.ml).toBe(500)
+    expect(await db.sides.get('2026-11-12:lunch')).toMatchObject({ slot: 'lunch', fromBatch: '2026-11-11' })
     expect(await db.mealPlan.get('2026-11-11')).toMatchObject({ title: 'Pasta carbonara', url: 'https://www.ica.se/recept/x/' })
   })
   it('avvisar filer från andra appar och ogiltiga varor', () => {
