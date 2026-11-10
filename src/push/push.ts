@@ -48,12 +48,18 @@ export async function unsubscribeDevice(client: SupabaseClient, userId: string):
 }
 
 /** Ersätter alla ännu inte skickade, framtida notiser med den nya planen. */
+/**
+ * Matplaneraren delar Supabase med Studieassistenten. Notisernas id får ett eget prefix, och bara
+ * den här appens egna kommande notiser ersätts, så att apparna inte raderar varandras.
+ */
+export const NOTIFY_PREFIX = 'mat:'
+
 export async function uploadNotifications(client: SupabaseClient, userId: string, planned: PlannedNotification[]): Promise<void> {
-  const del = await client.from('notifications').delete().eq('user_id', userId).eq('sent', false).gt('fire_at', new Date().toISOString())
+  const del = await client.from('notifications').delete().eq('user_id', userId).eq('sent', false).gt('fire_at', new Date().toISOString()).like('id', `${NOTIFY_PREFIX}%`)
   if (del.error) throw new Error(del.error.message)
   if (planned.length === 0) return
   const { error } = await client.from('notifications').upsert(
-    planned.map((n) => ({ user_id: userId, id: n.id, fire_at: n.fireAt.toISOString(), title: n.title, body: n.body })),
+    planned.map((n) => ({ user_id: userId, id: `${NOTIFY_PREFIX}${n.id}`, fire_at: n.fireAt.toISOString(), title: n.title, body: n.body })),
     { onConflict: 'user_id,id' },
   )
   if (error) throw new Error(error.message)
