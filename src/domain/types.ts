@@ -89,7 +89,7 @@ export interface PlannedSide {
   ingredients: { name: string; amount: string }[]
   /** Matlåda från storkoket det datumet; har inga egna ingredienser. */
   fromBatch?: ISODate
-  /** Riktigt recept från nätet (luncher); då är ingredienserna receptsidans. */
+  /** Riktigt recept från nätet; då är ingredienserna receptsidans. */
   url?: string
   site?: string
   updatedAt: string
@@ -129,32 +129,11 @@ export interface PlannedDinner {
 /** Sparas bara lokalt och ingår aldrig i export. OpenAI-nyckeln finns bara på servern. */
 export interface AiConfig {
   id: 'main'
-  /** Lösenord till appens server (api/chat). */
+  /** Lösenord till appens server (api/chat och api/recipes). */
   password: string
   model: string
   /** Senast hämtade modelllista från OpenAI. */
   models?: string[]
-}
-
-export type ChatCard =
-  | { type: 'shopping_update'; boughtIds: string[]; removeIds: string[]; bought: string[]; removed: string[] }
-  | { type: 'pantry_update'; id: string; before: string; after: Pick<PantryItem, 'name'> & Partial<Pick<PantryItem, 'amount' | 'expires'>> }
-  | { type: 'prefs_update'; food: Partial<Pick<FoodSettings, 'allergies' | 'portions'>>; nutrition: Partial<NutritionSettings>; summary: string[] }
-  | { type: 'memory_add'; fact: string }
-  | { type: 'memory_delete'; fact: string }
-  | { type: 'water_add'; date: ISODate; ml: number }
-  | { type: 'shopping_add'; items: { name: string; amount?: string }[] }
-  | { type: 'pantry_add'; items: { name: string; amount?: string; expires?: ISODate }[] }
-  | { type: 'pantry_remove'; ids: string[]; names: string[] }
-
-export interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  createdAt: string
-  card?: ChatCard
-  /** Status för kortet: väntar på ditt svar, genomfört eller avvisat. */
-  cardStatus?: 'pending' | 'done' | 'dismissed' | 'missing'
 }
 
 export interface Backup {

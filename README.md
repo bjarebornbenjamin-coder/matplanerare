@@ -6,11 +6,10 @@ Matplaneraren är utbruten ur Studieassistenten (repot `assistent`, grenen `stud
 
 ## Funktioner
 
-- **Meny (startsidan):** AI:n planerar 3–7 dagar: middag varje dag, och frukost och lunch de dagar du valt, utifrån matlagret (det som går ut först), dina preferenser och allergier. Skriv önskemål för veckan i fri text (t.ex. "fredag något lyxigt", "onsdag under 30 minuter"). Under Anpassa veckan väljer du vilka dagar du vill ha **frukost** och **lunch**, vilka dagar du **storkokar** (middagen lagas med extra portioner och blir matlådor till luncherna de närmaste fyra dagarna), allergier, portioner och vilka veckodagar du har **kort om tid** (snabba middagar) och vilka som är **träningsdagar** (proteinrikt). För varje dag hämtas ett riktigt recept från nätet, och det som saknas för hela veckan läggs på inköpslistan med ett tryck. Överst visas kvällens middag, vatten idag, lagret och veckan.
+- **Meny (startsidan):** AI:n planerar 3–7 dagar: middag varje dag, och frukost och lunch de dagar du valt (alla med riktiga recept från nätet), utifrån matlagret (det som går ut först), dina preferenser och allergier. Skriv önskemål för veckan i fri text (t.ex. "fredag något lyxigt", "onsdag under 30 minuter"). Under Anpassa veckan väljer du vilka dagar du vill ha **frukost** och **lunch**, vilka dagar du **storkokar** (middagen lagas med extra portioner och blir matlådor till luncherna de närmaste fyra dagarna), allergier, portioner och vilka veckodagar du har **kort om tid** (snabba middagar) och vilka som är **träningsdagar** (proteinrikt). För varje dag hämtas ett riktigt recept från nätet, och det som saknas för hela veckan läggs på inköpslistan med ett tryck. Överst visas kvällens middag, vatten idag, lagret och veckan.
 - **Lager:** varor med mängd och bäst före-datum. Lägg in för hand eller skanna kvitto eller kylskåp med kameran.
 - **Inköp:** inköpslista; köpta varor kan flyttas till lagret.
 - **Vatten:** fyll på glas direkt på startsidan; målet ställs in under Inställningar → Vatten. Appen räknar inte kalorier eller makron.
-- **Chatt:** matassistent som läser lager, inköpslista, meny och vatten och föreslår ändringar som du bekräftar. Kan söka upp riktiga recept på nätet.
 - **Notiser:** mat som snart går ut (med kvällens middag) och inköpslistan en vald veckodag.
 
 ## Kommandon
@@ -40,7 +39,7 @@ Sätt dessutom en utgiftsgräns på nyckeln hos OpenAI. Lokalt: `vercel dev` sta
 
 ## Synk mellan enheter (Supabase)
 
-Lokalt först: allt fungerar offline i IndexedDB. När du loggar in synkas meny, matlager, inköpslista, måltider, vatten och inställningar mot Supabase. Chatthistorik och lösenord synkas inte.
+Lokalt först: allt fungerar offline i IndexedDB. När du loggar in synkas meny (middag, frukost och lunch), betyg på rätter, matlager, inköpslista, vatten och inställningar mot Supabase. Lösenordet synkas inte.
 
 1. Skapa ett projekt på supabase.com.
 2. SQL Editor: kör innehållet i `supabase/schema.sql` (tabell + Row Level Security).

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { parseBackup } from './backup'
 import { db } from './db'
-import { rateDish, addChatMessage, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
+import { rateDish, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
 
 beforeEach(async () => {
-  await Promise.all([db.settings.clear(), db.chat.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
+  await Promise.all([db.settings.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
 })
 
 describe('export och import', () => {
@@ -32,20 +32,6 @@ describe('export och import', () => {
     expect(() => parseBackup({ app: 'matplanerare', version: 2 })).toThrow(/version/)
     expect(() => parseBackup({ app: 'matplanerare', version: 1, pantry: [{ id: 'x', name: '', addedAt: '2026-11-08' }] })).toThrow(/matvara/)
     expect(parseBackup({ app: 'matplanerare', version: 1 })).toMatchObject({ pantry: [], shopping: [], water: [], mealPlan: [], settings: null })
-  })
-})
-
-describe('chattordning', () => {
-  it('behåller ordningen även när meddelanden skapas samtidigt', async () => {
-    await db.chat.clear()
-    const orig = Date.now
-    Date.now = () => 1_800_000_000_000 // fryst klocka
-    try {
-      for (const t of ['1', '2', '3', '4']) await addChatMessage({ role: 'user', content: t })
-    } finally {
-      Date.now = orig
-    }
-    expect((await db.chat.orderBy('createdAt').toArray()).map((m) => m.content)).toEqual(['1', '2', '3', '4'])
   })
 })
 

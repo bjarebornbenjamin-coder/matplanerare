@@ -49,7 +49,7 @@ export function MealPlanTab() {
     const from = toISODate(new Date())
     const todo: RecipeTarget[] = [
       ...plan.filter((d) => d.date >= from && !d.url).map((d) => ({ id: d.id, title: d.title, table: 'mealPlan' as const })),
-      ...sides.filter((x) => x.date >= from && x.slot === 'lunch' && !x.fromBatch && !x.url).map((x) => ({ id: x.id, title: x.title, table: 'sides' as const })),
+      ...sides.filter((x) => x.date >= from && !x.fromBatch && !x.url).map((x) => ({ id: x.id, title: x.title, table: 'sides' as const })),
     ].filter((t) => !autoTried.has(t.id))
     if (todo.length === 0) return
     todo.forEach((t) => autoTried.add(t.id))
@@ -63,8 +63,8 @@ export function MealPlanTab() {
 
   const upcoming = plan.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date))
   const upcomingSides = sides.filter((x) => x.date >= today)
-  // Bara rätter med riktigt recept räknas (och frukost, som är enkel och inte har något recept).
-  const missing = missingForPlan([...upcoming.filter((d) => d.url), ...upcomingSides.filter((x) => !x.fromBatch && (x.url || x.slot === 'breakfast'))], pantry)
+  // Bara rätter med riktigt recept räknas; matlådor har inga egna ingredienser.
+  const missing = missingForPlan([...upcoming.filter((d) => d.url), ...upcomingSides.filter((x) => !x.fromBatch && x.url)], pantry)
   const dates = [...new Set([...upcoming.map((d) => d.date), ...upcomingSides.map((x) => x.date)])].sort()
   const food = settings.food
   const saveFood = (patch: Partial<typeof food>) => saveSettings({ food: { ...food, ...patch } })
@@ -135,18 +135,18 @@ export function MealPlanTab() {
         await db.sides.bulkPut(newSides.map((x) => ({ ...x, updatedAt: stamp })))
       })
       if (dinners.length < dates.length) setMessage(`AI:n gav bara ${dinners.length} av ${dates.length} dagar. Gör om för att fylla resten.`)
-      // Riktiga recept till middagarna, tre åt gången så att servern inte överbelastas.
+      // Riktiga recept till alla måltider (utom matlådor), fyra åt gången så att servern inte överbelastas.
       const headers = await authHeaders()
       dinners.forEach((d) => autoTried.add(d.id))
       newSides.forEach((x) => autoTried.add(x.id))
       const queue = [
         ...dinners.map((d) => ({ id: d.id, title: d.title, table: 'mealPlan' as const })),
-        ...newSides.filter((x) => x.slot === 'lunch' && !x.fromBatch).map((x) => ({ id: x.id, title: x.title, table: 'sides' as const })),
+        ...newSides.filter((x) => !x.fromBatch).map((x) => ({ id: x.id, title: x.title, table: 'sides' as const })),
       ]
       const total = queue.length
       let done = 0
       setProgress({ label: `Hämtar recept 0 av ${total}`, value: 30 })
-      await Promise.all(Array.from({ length: 3 }, async () => {
+      await Promise.all(Array.from({ length: 4 }, async () => {
         for (let d = queue.shift(); d; d = queue.shift()) {
           await findRecipe(d, headers)
           done++
@@ -304,6 +304,7 @@ export function MealPlanTab() {
                 {d.minutes !== null && <span className="tag num">{d.minutes} min</span>}
                 {d.url && <span className="tag">{d.site}</span>}
                 {d.url && <span className={`tag ${lacking ? 'warn' : 'ok'}`}>{lacking ? `${lacking} saknas` : 'Allt hemma'}</span>}
+                <RateButtons dish={d} ratings={ratings} />
               </div>
               {!d.url && !finding.has(d.id) && (
                 <p className="dinner-note">{notFound.has(d.id) ? 'Hittade inget recept på nätet för den här rätten. Försök igen, eller ta bort den och gör om menyn.' : 'Receptet är inte hämtat än.'}</p>
@@ -318,7 +319,6 @@ export function MealPlanTab() {
                 {d.url && <button type="button" className="btn" aria-expanded={open} onClick={() => setOpenIng((s) => { const n = new Set(s); if (open) n.delete(d.id); else n.add(d.id); return n })}>
                   Ingredienser <span className="num">{d.ingredients.length}</span> <svg className={`caret${open ? ' up' : ''}`} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
                 </button>}
-                <RateButtons dish={d} ratings={ratings} />
               </div>
               {open && d.url && (
                 <div className="dinner-ingredients">
@@ -398,8 +398,8 @@ function SideRow({ side, dinners, pantry, expiring, finding, notFound, onFind }:
   const title = side.fromBatch ? `Matlåda: ${from?.title ?? side.title}` : side.title
   const ingredients = withPantryStatus(side.ingredients, pantry)
   const lacking = ingredients.filter((i) => i.status === 'missing').length
-  // Luncher ska ha ett riktigt recept; frukost är enkel och visas med AI:ns ingredienser.
-  const needsRecipe = side.slot === 'lunch' && !side.fromBatch && !side.url
+  // Frukost och lunch ska ha ett riktigt recept, precis som middagen.
+  const needsRecipe = !side.fromBatch && !side.url
   const meta = side.fromBatch
     ? `Från storkoket ${WEEKDAYS_LONG[weekdayOf(side.fromBatch) - 1]}`
     : needsRecipe

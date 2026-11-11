@@ -1,6 +1,6 @@
 import { daysLeft, foodKey } from '../domain/food'
 import type { FoodSettings, ISODate, PantryItem } from '../domain/types'
-import { ChatError, describeError } from './chat'
+import { AiError, describeError } from './errors'
 
 /** Ett riktigt recept från en receptsajt. Ingredienserna är sidans egna. */
 export interface FoundRecipe {
@@ -52,11 +52,11 @@ export async function findRecipes(q: RecipeQuery, headers: Record<string, string
       }),
     })
   } catch {
-    throw new ChatError('Kunde inte nå servern. Kontrollera internetanslutningen.')
+    throw new AiError('Kunde inte nå servern. Kontrollera internetanslutningen.')
   }
-  if (!res.ok) throw new ChatError(await describeError(res))
+  if (!res.ok) throw new AiError(await describeError(res))
   const data = (await res.json()) as { recipes?: FoundRecipe[] }
-  if (!Array.isArray(data.recipes) || data.recipes.length === 0) throw new ChatError('Hittade inga recept.')
+  if (!Array.isArray(data.recipes) || data.recipes.length === 0) throw new AiError('Hittade inga recept.')
   return data.recipes
 }
 

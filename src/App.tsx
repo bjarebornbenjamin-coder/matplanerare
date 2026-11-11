@@ -7,7 +7,6 @@ import { useNotificationSync } from './push/useNotificationSync'
 import { useSyncRunner } from './sync/useSyncRunner'
 import { syncConfigured, useSession } from './sync/supabase'
 import { LoginScreen } from './sync/LoginForm'
-import { ChatPage } from './pages/Chat'
 import { MenuPage, PantryPage, ShoppingPage } from './pages/Pages'
 import { ScanFoodPage } from './pages/ScanFood'
 import { SettingsPage } from './pages/Settings'
@@ -17,7 +16,6 @@ const TABS = [
   { to: '/', label: 'Meny', also: ['/installningar'] as string[] },
   { to: '/lager', label: 'Lager', also: ['/skanna'] },
   { to: '/inkop', label: 'Inköp', also: [] },
-  { to: '/chatt', label: 'Chatt', also: [] },
 ]
 
 /** Varje ny sida börjar högst upp (annars följer scrollpositionen med mellan flikar). */
@@ -73,7 +71,6 @@ export function App() {
             <Route path="/lager" element={<PantryPage />} />
             <Route path="/inkop" element={<ShoppingPage />} />
             <Route path="/skanna" element={<ScanFoodPage />} />
-            <Route path="/chatt" element={<ChatPage />} />
             <Route path="/installningar" element={<SettingsPage />} />
             <Route path="/installningar/:del" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

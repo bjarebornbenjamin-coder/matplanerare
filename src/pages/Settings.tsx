@@ -39,7 +39,7 @@ function AiSection() {
     <>
       <h2>Modell</h2>
       <label className="field">
-        <span>Används i chatten och när AI:n läser bilder, gör veckomeny och uppskattar näring</span>
+        <span>Används när AI:n gör veckomenyn och läser bilder (kvitton och kylskåp)</span>
         <select value={config.model} onChange={(e) => saveAiConfig({ model: e.target.value })}>
           {models.map((m) => <option key={m} value={m}>{m}{m === DEFAULT_MODEL ? ' (standard)' : ''}</option>)}
         </select>
@@ -245,7 +245,7 @@ function MemorySection() {
   const memories = settings.memories
   return (
     <>
-      <p className="muted">Saker assistenten tar hänsyn till i alla svar. Be chatten komma ihåg något ("jag gillar inte svamp"), eller skriv in det här.</p>
+      <p className="muted">Saker AI:n tar hänsyn till när den gör menyn och letar recept, t.ex. "jag gillar inte svamp" eller "vi är två vuxna och ett barn".</p>
       {memories.length === 0 && <p className="empty">Inget sparat.</p>}
       {memories.map((m) => (
         <div className="item" key={m}>
@@ -326,7 +326,7 @@ export function SettingsPage() {
     synk: { title: 'Synk mellan enheter', body: <SyncSection /> },
     notiser: { title: 'Notiser', body: <NotifySection /> },
     ai: { title: 'AI-assistent', body: <AiSection /> },
-    minne: { title: 'Assistentens minne', body: <MemorySection /> },
+    minne: { title: 'Preferenser', body: <MemorySection /> },
     betyg: { title: 'Betyg på rätter', body: <RatingsSection /> },
     sakerhetskopia: {
       title: 'Säkerhetskopia',
@@ -376,7 +376,7 @@ export function SettingsPage() {
       rows: [
         { to: 'ai', title: 'AI-assistent', status: `${config?.model ?? DEFAULT_MODEL}${config?.password ? ', lösenord sparat' : ''}` },
         { to: 'betyg', title: 'Betyg på rätter', status: ratings?.length ? `${ratings.filter((r) => r.rating === 1).length} gillade, ${ratings.filter((r) => r.rating === -1).length} ogillade` : 'Inga än' },
-        { to: 'minne', title: 'Assistentens minne', status: settings.memories.length ? `${settings.memories.length} ${settings.memories.length === 1 ? 'sak' : 'saker'}` : 'Inget sparat' },
+        { to: 'minne', title: 'Preferenser', status: settings.memories.length ? `${settings.memories.length} ${settings.memories.length === 1 ? 'sak' : 'saker'}` : 'Inget sparat' },
       ],
     },
     { title: 'Data', rows: [{ to: 'sakerhetskopia', title: 'Säkerhetskopia', status: 'Exportera eller importera all data' }] },

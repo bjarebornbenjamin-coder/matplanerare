@@ -1,4 +1,4 @@
-import { ChatError, describeError } from './chat'
+import { AiError, describeError } from './errors'
 
 export function visionMessages(system: string, text: string, imageDataUrl: string) {
   return [
@@ -26,11 +26,11 @@ export async function callVision(
       body: JSON.stringify({ model: o.model, messages: visionMessages(o.system, o.text, o.image), response_format: { type: 'json_object' } }),
     })
   } catch {
-    throw new ChatError('Kunde inte nå servern. Kontrollera internetanslutningen.')
+    throw new AiError('Kunde inte nå servern. Kontrollera internetanslutningen.')
   }
-  if (!res.ok) throw new ChatError(await describeError(res))
+  if (!res.ok) throw new AiError(await describeError(res))
   const data = (await res.json()) as { choices?: { message?: { content?: string | null } }[] }
   const content = data.choices?.[0]?.message?.content
-  if (!content) throw new ChatError('Tomt svar från AI:n.')
+  if (!content) throw new AiError('Tomt svar från AI:n.')
   return content
 }

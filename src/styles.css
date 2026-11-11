@@ -129,38 +129,17 @@ input[type='date'] { width: 100%; padding: 10px 12px; min-height: 44px; border: 
 .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
 .today-h { color: var(--primary); }
 
-.chat-head { display: flex; justify-content: space-between; align-items: center; }
-.chat { display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; }
-.bubble { max-width: 85%; padding: 10px 14px; border-radius: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.bubble.user { align-self: flex-end; background: var(--primary-container); color: var(--on-primary-container); border-bottom-right-radius: 4px; }
-.bubble.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--outline); border-bottom-left-radius: 4px; }
-.card.proposal { align-self: stretch; margin-bottom: 0; }
-.composer {
-  display: flex; gap: 8px; align-items: flex-end; padding: 8px 0;
-}
-.composer-wrap { position: sticky; bottom: calc(52px + env(safe-area-inset-bottom)); background: var(--bg); }
-.quick { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 0; scrollbar-width: none; }
-.quick::-webkit-scrollbar { display: none; }
 .chip {
   flex: none; border: 1px solid var(--outline); background: var(--surface); color: var(--primary); border-radius: 999px;
   padding: 8px 14px; font-size: 14px; min-height: 40px; cursor: pointer;
 }
 .chip:disabled { opacity: 0.5; cursor: default; }
-.composer textarea { flex: 1; min-height: 44px; max-height: 140px; }
 .contact-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
 
 .warning { background: var(--primary-container); color: var(--on-primary-container); border-radius: 12px; padding: 8px 12px; margin: 8px 0; }
 .warning p { margin: 2px 0; }
 .dots i.lesson { background: var(--muted); }
 
-.md p { margin: 0 0 8px; }
-.md > :last-child { margin-bottom: 0; }
-.md ul, .md ol { margin: 0 0 8px; padding-left: 22px; }
-.md code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
-.bubble.assistant { white-space: normal; }
-
-/* så att senaste meddelandet och knapparna hamnar ovanför inmatningsfältet och menyn */
-.chat-end { scroll-margin-bottom: 190px; height: 1px; }
 
 .back { display: inline-block; padding: 8px 0; min-height: 44px; line-height: 28px; color: var(--primary); text-decoration: none; }
 .back + h1 { margin-top: 0; }
@@ -222,9 +201,6 @@ input[type='date'] { width: 100%; padding: 10px 12px; min-height: 44px; border: 
 :root[data-bg-image='on'] body::after { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; }
 :root[data-bg-image='on'] body::before { background: var(--bg-image) center / cover no-repeat; z-index: -2; }
 :root[data-bg-image='on'] body::after { background: var(--bg); opacity: var(--bg-veil, 0.72); }
-:root[data-bg-image='on'] .composer-wrap { background: transparent; }
-:root[data-bg-image='on'] .composer-wrap::before { content: ''; position: absolute; inset: 0; background: var(--bg); opacity: 0.85; z-index: -1; border-radius: 16px 16px 0 0; }
-:root[data-bg-image='on'] .composer-wrap { position: sticky; isolation: isolate; }
 .bg-preview { display: block; width: 100%; max-height: 160px; object-fit: cover; border-radius: 12px; border: 1px solid var(--outline); margin: 8px 0; }
 .range { width: 100%; accent-color: var(--primary); }
 
@@ -293,7 +269,6 @@ p, .sub, .note { text-wrap: pretty; }
   .btn, .tab, .chip, button.card, .task-main, .swatch { transition: transform 80ms ease, background-color 150ms ease, filter 150ms ease; }
   .btn:active:not(:disabled), .chip:active:not(:disabled), .tab:active, button.card:active { transform: scale(0.97); }
   .checklist label, .card.task .title { transition: color 150ms ease; }
-  .bubble, .card.proposal { animation: enter 160ms ease-out; }
   .thinking { animation: pulse 1.2s ease-in-out infinite; }
   .loading { animation: pulse 1.2s ease-in-out infinite; }
   @keyframes enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -364,7 +339,6 @@ button.card:hover, .card.task:hover { background: var(--surface-3); }
 .card.event { background: color-mix(in srgb, var(--primary) 12%, var(--surface)); border: 0; }
 .card.now { background: var(--primary-container); color: var(--on-primary-container); }
 .card.hero { padding: 16px 18px; border-radius: 16px; }
-.card.proposal { background: var(--surface-2); border: 0; }
 .card.recipe { padding: 16px; }
 .time { color: var(--muted); }
 
@@ -401,10 +375,6 @@ input[type='text'], input[type='time'], input[type='date'], select, textarea { b
 /* Nedräkning och märken: blå tonad, inte en ny färg. */
 .next-note { background: var(--accent-soft); color: var(--primary); font-weight: 500; }
 
-/* Chatt: bubblor utan ramar. */
-.bubble.assistant { background: var(--surface-2); border: 0; }
-.bubble.user { background: var(--primary-container); color: var(--on-primary-container); }
-.composer-wrap { background: var(--surface); }
 .chip { border-color: var(--outline-strong); background: transparent; }
 
 /* Avdelare och diagram: svaga linjer. */
@@ -692,3 +662,7 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 .past-title { font-weight: 500; }
 .past-title a { color: inherit; text-decoration: none; }
 .past-title a:hover { text-decoration: underline; }
+
+.dinner-tags { align-items: center; }
+.dinner-tags .rate-buttons { margin: -8px -8px -8px auto; }
+.dinner-tags .rate-buttons .icon-btn { width: 40px; height: 40px; }

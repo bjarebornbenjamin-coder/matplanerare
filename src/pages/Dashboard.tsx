@@ -65,7 +65,6 @@ export function Dashboard() {
             <div className="tonight-title">Ingen middag planerad</div>
             <div className="tonight-actions">
               <a className="btn on-hero" href="#planera">Gör veckomeny</a>
-              <Link className="btn on-hero-ghost" to="/chatt">Fråga chatten</Link>
             </div>
           </>
         )}

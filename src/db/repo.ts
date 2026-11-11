@@ -1,7 +1,7 @@
 import { DEFAULT_MODEL } from '../ai/models'
 import { toISODate } from '../domain/dates'
 import { foodKey } from '../domain/food'
-import type { AiConfig, Backup, ChatMessage, FoodSettings, NutritionSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
+import type { AiConfig, Backup, FoodSettings, NutritionSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
 import { db } from './db'
 
 export const newId = () => crypto.randomUUID()
@@ -28,24 +28,6 @@ export async function getAiConfig(): Promise<AiConfig> {
 
 export async function saveAiConfig(patch: Partial<Omit<AiConfig, 'id'>>): Promise<void> {
   await db.aiConfig.put({ ...(await getAiConfig()), ...patch })
-}
-
-export async function addChatMessage(m: Omit<ChatMessage, 'id' | 'createdAt'>): Promise<string> {
-  const id = newId()
-  // Strikt stigande tidsstämplar, så att meddelanden som skapas på samma millisekund behåller sin ordning.
-  const last = await db.chat.orderBy('createdAt').last()
-  let at = Date.now()
-  if (last && at <= new Date(last.createdAt).getTime()) at = new Date(last.createdAt).getTime() + 1
-  await db.chat.add({ ...m, id, createdAt: new Date(at).toISOString() })
-  return id
-}
-
-export async function setCardStatus(id: string, cardStatus: NonNullable<ChatMessage['cardStatus']>): Promise<void> {
-  await db.chat.update(id, { cardStatus })
-}
-
-export async function clearChat(): Promise<void> {
-  await db.chat.clear()
 }
 
 export async function savePantryItem(item: PantryItem): Promise<void> {

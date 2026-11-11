@@ -1,10 +1,9 @@
 import Dexie, { type Table } from 'dexie'
-import type { AiConfig, ChatMessage, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import type { AiConfig, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
 export class AppDB extends Dexie {
   settings!: Table<Settings, string>
   aiConfig!: Table<AiConfig, string>
-  chat!: Table<ChatMessage, string>
   pantry!: Table<PantryItem, string>
   shopping!: Table<ShoppingItem, string>
   water!: Table<WaterDay, string>
@@ -38,6 +37,8 @@ export class AppDB extends Dexie {
     this.version(2).stores({ meals: null })
     this.version(3).stores({ sides: 'id, date' })
     this.version(4).stores({ ratings: 'id' })
+    // Chatten är borttagen.
+    this.version(5).stores({ chat: null })
   }
 }
 

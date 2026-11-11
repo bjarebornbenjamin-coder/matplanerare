@@ -1,7 +1,7 @@
 import { addDays } from '../domain/dates'
 import { foodKey } from '../domain/food'
 import type { ISODate, PantryItem, ShoppingItem } from '../domain/types'
-import { ChatError } from './chat'
+import { AiError } from './errors'
 import { callVision } from './vision'
 
 export type ScanKind = 'receipt' | 'fridge'
@@ -41,10 +41,10 @@ export function parseScanResponse(text: string, kind: ScanKind, today: ISODate):
   try {
     data = JSON.parse(cleaned)
   } catch {
-    throw new ChatError('Kunde inte tolka svaret från AI:n. Försök igen med en skarpare bild.')
+    throw new AiError('Kunde inte tolka svaret från AI:n. Försök igen med en skarpare bild.')
   }
   const list = Array.isArray(data) ? data : (data as { items?: unknown })?.items
-  if (!Array.isArray(list)) throw new ChatError('Svaret innehöll inga varor.')
+  if (!Array.isArray(list)) throw new AiError('Svaret innehöll inga varor.')
   const rows: ScanRow[] = []
   const seen = new Set<string>()
   let skipped = 0

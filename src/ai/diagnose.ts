@@ -56,5 +56,5 @@ export async function diagnose(headers: Record<string, string> = {}, fetchFn: ty
   } catch {
     return { ok: false, message: 'Kunde inte nå servern när lösenordet testades.' }
   }
-  return { ok: true, message: 'Allt fungerar: servern, OpenAI-nyckeln och lösenordet. Chatten ska nu svara.' }
+  return { ok: true, message: 'Allt fungerar: servern, OpenAI-nyckeln och lösenordet. Veckomenyn och skanningen ska nu fungera.' }
 }

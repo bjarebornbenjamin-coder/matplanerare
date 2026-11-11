@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { runChat } from './chat'
 import { DEFAULT_MODEL, fetchModels, filterChatModels } from './models'
 
 describe('modeller', () => {
@@ -17,26 +16,5 @@ describe('modeller', () => {
     await expect(fetchModels({ 'x-app-password': 'k' }, unauthorized)).rejects.toThrow(/lösenord/i)
     const empty = (async () => new Response(JSON.stringify({ data: [{ id: 'whisper-1' }] }))) as unknown as typeof fetch
     await expect(fetchModels({ 'x-app-password': 'k' }, empty)).rejects.toThrow(/inga chattmodeller/)
-  })
-})
-
-describe('reservmodell', () => {
-  it('faller tillbaka på standardmodellen om vald modell saknas', async () => {
-    const used: string[] = []
-    const fetchFn = (async (_u: string, init: RequestInit) => {
-      const model = JSON.parse(init.body as string).model
-      used.push(model)
-      return model === 'finns-inte'
-        ? new Response(JSON.stringify({ error: { message: 'nope' } }), { status: 404 })
-        : new Response(JSON.stringify({ choices: [{ message: { content: 'Hej' } }] }))
-    }) as unknown as typeof fetch
-    const ctx = { settings: { id: 'main' as const, theme: 'system' as const, food: { allergies: '', portions: 2, quickWeekdays: [], trainingWeekdays: [], breakfastWeekdays: [], lunchWeekdays: [], batchWeekdays: [], boxPortions: 1, shopping: { enabled: true, weekday: 5, time: '16:00' }, expiry: { enabled: true, time: '08:00' } }, nutrition: { waterMl: 2000, glassMl: 250 }, memories: [] }, pantry: [], shopping: [], water: [], mealPlan: [], sides: [] }
-    const res = await runChat({ headers: { 'x-app-password': 'k' }, model: 'finns-inte', history: [], userText: 'hej', now: new Date(), loadContext: async () => ctx, fetchFn })
-    expect(used).toEqual(['finns-inte', DEFAULT_MODEL])
-    expect(res.reply).toBe('Hej')
-    expect(res.notice).toContain('finns-inte')
-    // standardmodellen själv ger inget oändligt omförsök
-    const always404 = (async () => new Response('{}', { status: 404 })) as unknown as typeof fetch
-    await expect(runChat({ headers: { 'x-app-password': 'k' }, model: DEFAULT_MODEL, history: [], userText: 'hej', now: new Date(), loadContext: async () => ctx, fetchFn: always404 })).rejects.toThrow(/Modellen hittades inte/)
   })
 })

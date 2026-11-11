@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
 import { db } from './db/db'
 import { getAiConfig, withDefaults } from './db/repo'
-import type { AiConfig, ChatMessage, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from './domain/types'
+import type { AiConfig, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from './domain/types'
 
 /** undefined medan data läses från IndexedDB. */
 export function useSettings(): Settings | undefined {
@@ -30,9 +30,6 @@ export function useSides(): PlannedSide[] | undefined {
 }
 export function useAiConfig(): AiConfig | undefined {
   return useLiveQuery(() => getAiConfig(), [])
-}
-export function useChat(): ChatMessage[] | undefined {
-  return useLiveQuery(() => db.chat.orderBy('createdAt').toArray(), [])
 }
 
 /** Aktuell tid, uppdateras varje minut. */
