@@ -8,7 +8,7 @@ Matplaneraren är utbruten ur Studieassistenten (repot `assistent`, grenen `stud
 
 - **Meny (startsidan):** AI:n planerar 3–7 dagar: middag varje dag, och frukost och lunch de dagar du valt (alla med riktiga recept från nätet), utifrån matlagret (det som går ut först), dina preferenser och allergier. Skriv önskemål för veckan i fri text (t.ex. "fredag något lyxigt", "onsdag under 30 minuter"). Under Anpassa veckan väljer du vilka dagar du vill ha **frukost** och **lunch**, vilka dagar du **storkokar** (middagen lagas med extra portioner och blir matlådor till luncherna de närmaste fyra dagarna), allergier, portioner och vilka veckodagar du har **kort om tid** (snabba middagar) och vilka som är **träningsdagar** (proteinrikt). För varje dag hämtas ett riktigt recept från nätet, och det som saknas för hela veckan läggs på inköpslistan med ett tryck. Överst visas kvällens middag, vatten idag, lagret och veckan.
 - **Lager:** varor med mängd och bäst före-datum. Lägg in för hand eller skanna kvitto eller kylskåp med kameran.
-- **Inköp:** inköpslista; köpta varor kan flyttas till lagret.
+- **Inköp:** inköpslista; köpta varor kan flyttas till lagret. "Lägg det som saknas på inköpslistan" låter AI:n räkna ihop veckans alla ingredienser mot lagret: samma vara slås ihop, namnen rensas ("Franska örter", inte "frysta franska örter 3 g") och mängderna avrundas uppåt till förpackningar man kan köpa. "Städa listan" gör samma sak med listan som den är. Utan AI läggs det som saknas till med rensade namn.
 - **Vatten:** fyll på glas direkt på startsidan; målet ställs in under Inställningar → Vatten. Appen räknar inte kalorier eller makron.
 - **Notiser:** mat som snart går ut (med kvällens middag) och inköpslistan en vald veckodag.
 

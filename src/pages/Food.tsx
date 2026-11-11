@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { AiProgress } from '../components/AiProgress'
+import { planShopping } from '../ai/shoppingPlan'
+import { authHeaders } from '../lib/auth'
 import { PantryForm } from '../components/PantryForm'
-import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, runOut, saveShoppingItem } from '../db/repo'
+import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, replaceOpenShopping, runOut, saveShoppingItem } from '../db/repo'
 import { toISODate } from '../domain/dates'
 import { expiryLabel, expiryStatus, expiringWithin, sortPantry } from '../domain/food'
 import type { PantryItem } from '../domain/types'
-import { useFieldError, useNow, usePantry, useShopping } from '../hooks'
+import { useAiConfig, useFieldError, useNow, usePantry, useShopping } from '../hooks'
 import { undoable } from '../lib/undo'
 
 function RunOutDialog({ item, onClose }: { item: PantryItem; onClose: () => void }) {
@@ -71,6 +74,9 @@ export function ShoppingTab() {
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [message, setMessage] = useState('')
+  const [tidying, setTidying] = useState(false)
+  const pantry = usePantry()
+  const config = useAiConfig()
   const { error, fail, touch } = useFieldError()
   if (!shopping) return null
 
@@ -85,6 +91,23 @@ export function ShoppingTab() {
     setName('')
     setAmount('')
     setMessage('')
+  }
+
+  /** Slår ihop dubbletter, rensar namnen och räknar om mängderna med AI. */
+  async function tidy() {
+    setTidying(true)
+    setMessage('')
+    try {
+      const current = shopping!.filter((i) => !i.done)
+      const lines = await planShopping({ needs: [], pantry: pantry ?? [], current }, config?.model ?? 'gpt-4o-mini', await authHeaders())
+      await undoable('Inköpslistan är städad', ['shopping'], () => replaceOpenShopping(lines))
+      const merged = current.length - lines.length
+      setMessage(merged > 0 ? `${merged} ${merged === 1 ? 'dubblett' : 'dubbletter'} slogs ihop.` : 'Listan är städad.')
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Kunde inte städa listan.')
+    } finally {
+      setTidying(false)
+    }
   }
 
   async function toPantry() {
@@ -112,7 +135,11 @@ export function ShoppingTab() {
       </form>
       {error && <p className="error" role="alert">{error}</p>}
 
-      <p className="muted" style={{ marginTop: 12 }}>{open.length === 0 ? 'Inköpslistan är tom.' : `${open.length} att köpa`}</p>
+      <div className="list-head">
+        <p className="muted">{open.length === 0 ? 'Inköpslistan är tom.' : `${open.length} att köpa`}</p>
+        {open.length > 1 && <button type="button" className="btn text" disabled={tidying} onClick={tidy}>{tidying ? 'Städar…' : 'Städa listan'}</button>}
+      </div>
+      <AiProgress active={tidying} expected={12} label="Slår ihop och rensar listan" />
       {open.map(row)}
 
       {bought.length > 0 && (

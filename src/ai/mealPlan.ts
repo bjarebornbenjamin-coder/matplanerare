@@ -3,6 +3,7 @@ import { daysLeft, foodKey } from '../domain/food'
 import type { FoodSettings, ISODate, PantryItem, PlannedDinner, PlannedSide, SideSlot } from '../domain/types'
 import { AiError, describeError } from './errors'
 import { parseQty, withPantryStatus } from './recipes'
+import { cleanName, shoppingAmount } from '../domain/shoppingName'
 
 export interface DayContext {
   date: ISODate
@@ -233,9 +234,12 @@ export function missingForPlan(plan: { title: string; ingredients: { name: strin
   for (const d of plan) {
     for (const i of withPantryStatus(d.ingredients, pantry)) {
       if (i.status !== 'missing') continue
-      const k = foodKey(i.name)
-      const row = byKey.get(k) ?? { name: i.name, amounts: [], dishes: [] }
-      if (i.amount) row.amounts.push(i.amount)
+      // Rena namn så att "frysta franska örter" och "franska örter" blir samma rad.
+      const name = cleanName(i.name)
+      const k = foodKey(name)
+      const row = byKey.get(k) ?? { name, amounts: [], dishes: [] }
+      const amount = shoppingAmount(i.amount)
+      if (amount) row.amounts.push(amount)
       row.dishes.push(d.title)
       byKey.set(k, row)
     }

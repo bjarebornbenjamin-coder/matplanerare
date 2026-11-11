@@ -40,6 +40,17 @@ describe('veckomeny', () => {
     ])
   })
 
+  it('reserven utan AI rensar namnen och slår ihop samma vara', () => {
+    const plan = [
+      dinner('2026-11-10', 'Laxsoppa', [{ name: 'frysta franska örter', amount: '3 g' }, { name: 'potatis', amount: '400 g' }]),
+      dinner('2026-11-11', 'Pyttipanna', [{ name: 'Potatis, gärna fast', amount: '600 g' }, { name: 'franska örter', amount: '1 tsk' }]),
+    ]
+    expect(missingForPlan(plan, [])).toEqual([
+      { name: 'Franska örter', note: 'Veckomeny: Laxsoppa, Pyttipanna' },
+      { name: 'Potatis', amount: '1 kg', note: 'Veckomeny: Laxsoppa, Pyttipanna' },
+    ])
+  })
+
   it('börjar idag före 17, annars imorgon, och skickar dagarna till servern', async () => {
     expect(planStart('2026-11-10', '16:59')).toBe('2026-11-10')
     expect(planStart('2026-11-10', '17:00')).toBe('2026-11-11')

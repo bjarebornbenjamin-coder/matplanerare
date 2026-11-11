@@ -118,6 +118,37 @@ export async function addShoppingItems(drafts: ShoppingDraft[], today = toISODat
   })
 }
 
+/**
+ * Ersätter det som inte är köpt med en ny, sammanslagen lista. Köpta varor rörs inte. En vara
+ * som finns kvar behåller sitt id (och när den lades till), så att synken inte ser den som ny.
+ */
+export async function replaceOpenShopping(lines: ShoppingDraft[], today = toISODate(new Date())): Promise<number> {
+  return db.transaction('rw', db.shopping, async () => {
+    const open = (await db.shopping.toArray()).filter((i) => !i.done)
+    const byKey = new Map(open.map((i) => [foodKey(i.name), i]))
+    const keep = new Set<string>()
+    const stamp = new Date().toISOString()
+    for (const l of lines) {
+      const name = l.name.trim()
+      if (!name) continue
+      const old = byKey.get(foodKey(name))
+      const item = {
+        id: old && !keep.has(old.id) ? old.id : newId(),
+        name,
+        ...(l.amount?.trim() ? { amount: l.amount.trim() } : {}),
+        ...(l.note?.trim() ? { note: l.note.trim() } : {}),
+        done: false,
+        addedAt: old?.addedAt ?? today,
+        updatedAt: stamp,
+      }
+      keep.add(item.id)
+      await db.shopping.put(item)
+    }
+    await db.shopping.bulkDelete(open.filter((i) => !keep.has(i.id)).map((i) => i.id))
+    return keep.size
+  })
+}
+
 export async function moveBoughtToPantry(today = toISODate(new Date())): Promise<number> {
   return db.transaction('rw', db.shopping, db.pantry, async () => {
     const bought = (await db.shopping.toArray()).filter((i) => i.done)

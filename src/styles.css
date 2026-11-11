@@ -666,3 +666,6 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 .dinner-tags { align-items: center; }
 .dinner-tags .rate-buttons { margin: -8px -8px -8px auto; }
 .dinner-tags .rate-buttons .icon-btn { width: 40px; height: 40px; }
+
+.list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.list-head p { margin: 0; }

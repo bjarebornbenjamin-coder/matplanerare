@@ -6,7 +6,8 @@ import { boxSides, fetchVariedMealPlan, missingForPlan, planDays, planStart } fr
 import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
-import { addShoppingItems, dishId, getSettings, rateDish, saveSettings } from '../db/repo'
+import { addShoppingItems, dishId, getSettings, rateDish, replaceOpenShopping, saveSettings } from '../db/repo'
+import { planShopping } from '../ai/shoppingPlan'
 import { WEEKDAYS_LONG, WEEKDAYS_SHORT, addDays, dayLabel, parseISODate, toHHmm, toISODate, weekdayOf } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
 import { httpsUrl, recipeSearchUrl } from '../domain/recipeLink'
@@ -36,6 +37,7 @@ export function MealPlanTab() {
   const [finding, setFinding] = useState<Set<string>>(new Set())
   const [notFound, setNotFound] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
+  const [shopping, setShopping] = useState(false)
   /** Förlopp när menyn görs: uppskattning medan AI:n planerar, sedan verkligt per hämtat recept. */
   const [progress, setProgress] = useState<{ label: string; value?: number }>({ label: 'Planerar rätterna' })
   const [openIng, setOpenIng] = useState<Set<string>>(new Set())
@@ -161,9 +163,27 @@ export function MealPlanTab() {
     }
   }
 
+  /**
+   * AI:n räknar ihop hela veckans ingredienser mot lagret och listan: rena namn, inga dubbletter,
+   * mängder som går att köpa. Går det inte läggs det som saknas till som förut.
+   */
   async function shop() {
-    const { added, skipped } = await addShoppingItems(missing)
-    setMessage(added ? `${added} varor på inköpslistan${skipped ? ` (${skipped} fanns redan)` : ''}.` : 'Allt fanns redan på inköpslistan.')
+    setShopping(true)
+    try {
+      const withRecipe = [...upcoming.filter((d) => d.url), ...upcomingSides.filter((x) => !x.fromBatch && x.url)]
+      const needs = withRecipe.flatMap((d) => d.ingredients.map((i) => ({ name: i.name, amount: i.amount, dish: d.title })))
+      const current = (await db.shopping.toArray()).filter((i) => !i.done)
+      try {
+        const lines = await planShopping({ needs, pantry: pantry!, current }, config?.model ?? 'gpt-4o-mini', await authHeaders())
+        await undoable('Inköpslistan är uppdaterad', ['shopping'], () => replaceOpenShopping(lines))
+        setMessage(`Inköpslistan har ${lines.length} varor, sammanräknade för hela veckan.`)
+      } catch {
+        const { added, skipped } = await addShoppingItems(missing)
+        setMessage(`AI:n kunde inte räkna ihop listan just nu, så det som saknas lades till som det är. ${added ? `${added} varor på inköpslistan${skipped ? ` (${skipped} fanns redan)` : ''}.` : 'Allt fanns redan på inköpslistan.'}`)
+      }
+    } finally {
+      setShopping(false)
+    }
   }
 
   return (
@@ -254,6 +274,7 @@ export function MealPlanTab() {
           <DoneButton onClick={shop} doneText="På inköpslistan" resetKey={missing.map((m) => m.name).join('|')}>Lägg det som saknas på inköpslistan ({missing.length})</DoneButton>
         </div>
       )}
+      <AiProgress active={shopping} expected={15} label="Räknar ihop veckans inköp" />
       {message && <p className="muted" role="status">{message}</p>}
 
       {dates.length > 0 && <h2 id="veckans-mat">Veckans mat</h2>}

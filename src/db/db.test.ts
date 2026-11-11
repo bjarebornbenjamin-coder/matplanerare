@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { parseBackup } from './backup'
 import { db } from './db'
-import { rateDish, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
+import { rateDish, replaceOpenShopping, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
 
 beforeEach(async () => {
   await Promise.all([db.settings.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
@@ -105,5 +105,22 @@ describe('betyg på rätter', () => {
     const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
     expect(backup.ratings).toMatchObject([{ id: 'tacos', title: 'Tacos', rating: 1 }])
     expect(() => parseBackup({ app: 'matplanerare', version: 1, ratings: [{ id: 'x', title: 'X', rating: 5 }] })).toThrow(/betyg/)
+  })
+})
+
+describe('replaceOpenShopping', () => {
+  it('ersätter det som inte är köpt, rör inte köpta varor och behåller id för varor som finns kvar', async () => {
+    await db.shopping.clear()
+    await db.shopping.bulkPut([
+      { id: 'a', name: 'Potatis', amount: '1 kg', done: false, addedAt: '2026-11-01', updatedAt: '' },
+      { id: 'b', name: 'potatis, fast', done: false, addedAt: '2026-11-02', updatedAt: '' },
+      { id: 'c', name: 'Mjölk', done: true, addedAt: '2026-11-01', updatedAt: '' },
+    ])
+    expect(await replaceOpenShopping([{ name: 'Potatis', amount: '2 kg', note: 'Pyttipanna, Ugnslax' }, { name: 'Franska örter' }], '2026-11-11')).toBe(2)
+    const all = await db.shopping.toArray()
+    expect(all.find((i) => i.name === 'Potatis')).toMatchObject({ id: 'a', amount: '2 kg', addedAt: '2026-11-01', done: false })
+    expect(all.find((i) => i.name === 'Franska örter')).toMatchObject({ addedAt: '2026-11-11', done: false })
+    expect(all.find((i) => i.id === 'b')).toBeUndefined()
+    expect(all.find((i) => i.id === 'c')).toMatchObject({ name: 'Mjölk', done: true })
   })
 })
