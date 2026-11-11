@@ -13,7 +13,7 @@ describe('veckomeny', () => {
     expect(dayContext('2026-11-12', food)).toMatchObject({ quick: false, training: false })
   })
 
-  it('tar bara begärda datum, ett per dag, och kräver ingredienser och steg', () => {
+  it('tar bara begärda datum, ett per dag; ingredienser behövs inte (de kommer från receptet)', () => {
     const text = JSON.stringify({
       days: [
         { date: '2026-11-10', title: 'Pasta carbonara', ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: ['Koka'] },
@@ -23,7 +23,8 @@ describe('veckomeny', () => {
       ],
     })
     const plan = parseMealPlan(text, ['2026-11-10', '2026-11-11'], 2)
-    expect(plan.map((d) => d.title)).toEqual(['Pasta carbonara'])
+    expect(plan.map((d) => d.title)).toEqual(['Pasta carbonara', 'Tom'])
+    expect(plan[1]).toMatchObject({ ingredients: [], steps: [] })
     expect(plan[0]).toMatchObject({ id: '2026-11-10', portions: 2 })
     expect(() => parseMealPlan('inte json', ['2026-11-10'], 2)).toThrow(/tolka/)
   })
@@ -171,5 +172,23 @@ describe('variation', () => {
     }) as typeof fetch
     await fetchVariedMealPlan({ days: [dayContext('2026-11-10', food)], pantry, food: { allergies: '', portions: 2 }, memories: [], recent: ['Tacos'], replacing: ['Pasta carbonara'], today: '2026-11-10' }, 'm', {}, fetchFn)
     expect(calls).toBe(1)
+  })
+})
+
+describe('tumme upp och ner', () => {
+  it('skickas med, och ogillade rätter räknas som upprepningar', async () => {
+    const sent: Record<string, unknown>[] = []
+    const answers = [['Fisksoppa', 'Lasagne'], ['Thaicurry', 'Lasagne']]
+    const fetchFn = (async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(JSON.parse(String(init.body)).messages[1].content))
+      const content = JSON.stringify({ days: ['2026-11-10', '2026-11-11'].map((date, i) => ({ date, title: answers[sent.length - 1][i] })) })
+      return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+    }) as typeof fetch
+    const days = [dayContext('2026-11-10', food), dayContext('2026-11-11', food)]
+    const r = await fetchVariedMealPlan({ days, pantry, food: { allergies: '', portions: 2 }, memories: [], recent: ['Lasagne'], disliked: ['Fisksoppa'], liked: ['Tacos'], today: '2026-11-10' }, 'm', {}, fetchFn)
+    expect(sent[0]).toMatchObject({ liked: ['Tacos'], disliked: ['Fisksoppa'] })
+    expect(sent).toHaveLength(2)
+    expect(r.dinners.map((d) => d.title)).toEqual(['Thaicurry', 'Lasagne'])
+    expect(MEAL_PLAN_PROMPT).toMatch(/disliked/)
   })
 })

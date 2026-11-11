@@ -6,13 +6,13 @@ import { boxSides, fetchVariedMealPlan, missingForPlan, planDays, planStart } fr
 import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
-import { addShoppingItems, getSettings, saveSettings } from '../db/repo'
+import { addShoppingItems, dishId, getSettings, rateDish, saveSettings } from '../db/repo'
 import { WEEKDAYS_LONG, WEEKDAYS_SHORT, addDays, dayLabel, parseISODate, toHHmm, toISODate, weekdayOf } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
 import { recipeSearchUrl } from '../domain/recipeLink'
 import { recipeForDish, splitIngredient } from '../ai/recipeSearch'
-import type { PantryItem, PlannedDinner, PlannedSide } from '../domain/types'
-import { useAiConfig, useMealPlan, useNow, usePantry, useSettings, useSides } from '../hooks'
+import type { DishRating, PantryItem, PlannedDinner, PlannedSide } from '../domain/types'
+import { useAiConfig, useMealPlan, useNow, usePantry, useRatings, useSettings, useSides } from '../hooks'
 import { authHeaders } from '../lib/auth'
 import { undoable } from '../lib/undo'
 
@@ -24,6 +24,7 @@ const autoTried = new Set<string>()
 export function MealPlanTab() {
   const plan = useMealPlan()
   const sides = useSides()
+  const ratings = useRatings()
   const pantry = usePantry()
   const settings = useSettings()
   const config = useAiConfig()
@@ -35,6 +36,8 @@ export function MealPlanTab() {
   const [finding, setFinding] = useState<Set<string>>(new Set())
   const [notFound, setNotFound] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
+  /** Förlopp när menyn görs: uppskattning medan AI:n planerar, sedan verkligt per hämtat recept. */
+  const [progress, setProgress] = useState<{ label: string; value?: number }>({ label: 'Planerar rätterna' })
   const [openIng, setOpenIng] = useState<Set<string>>(new Set())
   const [wishes, setWishes] = useState<string | null>(null)
   const [allergies, setAllergies] = useState<string | null>(null)
@@ -56,7 +59,7 @@ export function MealPlanTab() {
     })
   }, [plan, sides, pantry, settings, busy])
 
-  if (!plan || !sides || !pantry || !settings) return null
+  if (!plan || !sides || !ratings || !pantry || !settings) return null
 
   const upcoming = plan.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date))
   const upcomingSides = sides.filter((x) => x.date >= today)
@@ -102,6 +105,8 @@ export function MealPlanTab() {
     setBusy(true)
     setError('')
     setMessage('')
+    setProgress({ label: 'Planerar rätterna' })
+    requestAnimationFrame(() => document.getElementById('plan-progress')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
     try {
       const stored = await getSettings()
       // Önskemål som skrivits men inte sparats än (rutan sparar när den lämnas).
@@ -113,7 +118,11 @@ export function MealPlanTab() {
       const usable = pantry!.filter((p) => !p.expires || p.expires >= today)
       const planned = planDays(dates, s.food)
       const { dinners, sides: aiSides } = await fetchVariedMealPlan(
-        { days: planned.days, pantry: usable, food: s.food, memories: s.memories, recent, replacing, today },
+        {
+          days: planned.days, pantry: usable, food: s.food, memories: s.memories, recent, replacing, today,
+          liked: ratings!.filter((r) => r.rating === 1).map((r) => r.title).slice(0, 30),
+          disliked: ratings!.filter((r) => r.rating === -1).map((r) => r.title).slice(0, 50),
+        },
         config?.model ?? 'gpt-4o-mini',
         await authHeaders(),
       )
@@ -134,9 +143,17 @@ export function MealPlanTab() {
         ...dinners.map((d) => ({ id: d.id, title: d.title, table: 'mealPlan' as const })),
         ...newSides.filter((x) => x.slot === 'lunch' && !x.fromBatch).map((x) => ({ id: x.id, title: x.title, table: 'sides' as const })),
       ]
+      const total = queue.length
+      let done = 0
+      setProgress({ label: `Hämtar recept 0 av ${total}`, value: 30 })
       await Promise.all(Array.from({ length: 3 }, async () => {
-        for (let d = queue.shift(); d; d = queue.shift()) await findRecipe(d, headers)
+        for (let d = queue.shift(); d; d = queue.shift()) {
+          await findRecipe(d, headers)
+          done++
+          setProgress({ label: `Hämtar recept ${done} av ${total}`, value: 30 + (70 * done) / total })
+        }
       }))
+      requestAnimationFrame(() => document.getElementById('veckans-mat')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Något gick fel.')
     } finally {
@@ -174,8 +191,11 @@ export function MealPlanTab() {
           </select>
         </label>
         <button type="button" className="btn primary" disabled={busy} onClick={generate}>
-          {busy ? 'Planerar… (kan ta en halv minut)' : upcoming.length ? 'Gör ny meny' : 'Gör veckomeny'}
+          {busy ? 'Gör menyn…' : upcoming.length ? 'Gör ny meny' : 'Gör veckomeny'}
         </button>
+      </div>
+      <div id="plan-progress">
+        <AiProgress active={busy} expected={20} cap={30} value={progress.value} label={progress.label} />
       </div>
       <details className="plan-options">
         <summary>Anpassa veckan</summary>
@@ -222,7 +242,6 @@ export function MealPlanTab() {
         </div>
         <p className="footnote">AI:n väljer rätterna utifrån lagret, dina önskemål och de här dagarna. Kolla allergier.</p>
       </details>
-      <AiProgress active={busy} expected={30} label="Planerar middagarna" />
       {error && (
         <>
           <p className="error" role="alert">{error}</p>
@@ -237,7 +256,7 @@ export function MealPlanTab() {
       )}
       {message && <p className="muted" role="status">{message}</p>}
 
-      {dates.length > 0 && <h2>Veckans mat</h2>}
+      {dates.length > 0 && <h2 id="veckans-mat">Veckans mat</h2>}
       {dates.length === 0 && !busy && <p className="empty">Ingen meny än. Tryck Gör veckomeny.</p>}
       {dates.map((date) => {
         const d = upcoming.find((x) => x.date === date)
@@ -299,6 +318,7 @@ export function MealPlanTab() {
                 {d.url && <button type="button" className="btn" aria-expanded={open} onClick={() => setOpenIng((s) => { const n = new Set(s); if (open) n.delete(d.id); else n.add(d.id); return n })}>
                   Ingredienser <span className="num">{d.ingredients.length}</span> <svg className={`caret${open ? ' up' : ''}`} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
                 </button>}
+                <RateButtons dish={d} ratings={ratings} />
               </div>
               {open && d.url && (
                 <div className="dinner-ingredients">
@@ -312,7 +332,51 @@ export function MealPlanTab() {
           </section>
         )
       })}
+      <PastDinners plan={plan} today={today} ratings={ratings} />
     </>
+  )
+}
+
+const THUMB_UP = 'M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3'
+const THUMB_DOWN = 'M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17'
+
+/** Tumme upp/ner. Samma tumme igen tar bort betyget. Används när menyn planeras. */
+function RateButtons({ dish, ratings }: { dish: { title: string; date?: string; url?: string; site?: string }; ratings: DishRating[] }) {
+  const current = ratings.find((r) => r.id === dishId(dish.title))?.rating
+  const btn = (rating: 1 | -1, path: string, label: string) => (
+    <button type="button" className={`icon-btn rate${current === rating ? (rating === 1 ? ' up' : ' down') : ''}`} aria-pressed={current === rating} aria-label={`${label}: ${dish.title}`} onClick={() => rateDish(dish, rating)}>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill={current === rating ? 'currentColor' : 'none'} fillOpacity={0.2} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>
+    </button>
+  )
+  return (
+    <span className="rate-buttons">
+      {btn(1, THUMB_UP, 'Gillade')}
+      {btn(-1, THUMB_DOWN, 'Gillade inte')}
+    </span>
+  )
+}
+
+/** De senaste sju dagarnas middagar, så att man kan säga vad man tyckte. */
+function PastDinners({ plan, today, ratings }: { plan: PlannedDinner[]; today: string; ratings: DishRating[] }) {
+  const past = plan.filter((d) => d.date < today && d.date >= addDays(today, -7)).sort((a, b) => b.date.localeCompare(a.date))
+  if (past.length === 0) return null
+  const unrated = past.filter((d) => !ratings.some((r) => r.id === dishId(d.title))).length
+  return (
+    <section aria-label="Hur var maten?">
+      <h2>Hur var maten?</h2>
+      <p className="footnote">{unrated ? 'Tumme upp så kommer rätten gärna tillbaka, tumme ner så föreslås den aldrig igen.' : 'Tack! Betygen används när nästa meny görs.'}</p>
+      <div className="past-list">
+        {past.map((d) => (
+          <div key={d.id} className="past-row">
+            <div className="past-body">
+              <div className="sub">{dayLabel(d.date)}</div>
+              <div className="past-title">{d.url ? <a href={d.url} target="_blank" rel="noreferrer">{d.title}</a> : d.title}</div>
+            </div>
+            <RateButtons dish={d} ratings={ratings} />
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 

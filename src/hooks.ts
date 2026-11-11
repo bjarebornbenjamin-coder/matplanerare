@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
 import { db } from './db/db'
 import { getAiConfig, withDefaults } from './db/repo'
-import type { AiConfig, ChatMessage, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from './domain/types'
+import type { AiConfig, ChatMessage, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from './domain/types'
 
 /** undefined medan data läses från IndexedDB. */
 export function useSettings(): Settings | undefined {
@@ -21,6 +21,9 @@ export function useWater(): WaterDay[] | undefined {
 }
 export function useMealPlan(): PlannedDinner[] | undefined {
   return useLiveQuery(() => db.mealPlan.toArray(), [])
+}
+export function useRatings(): DishRating[] | undefined {
+  return useLiveQuery(() => db.ratings.toArray(), [])
 }
 export function useSides(): PlannedSide[] | undefined {
   return useLiveQuery(() => db.sides.toArray(), [])

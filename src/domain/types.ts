@@ -95,6 +95,18 @@ export interface PlannedSide {
   updatedAt: string
 }
 
+/** Tumme upp eller ner på en rätt. id = rättens namn i normaliserad form, så en rad per rätt. */
+export interface DishRating {
+  id: string
+  title: string
+  rating: 1 | -1
+  /** Senaste dagen rätten stod på menyn när den betygsattes. */
+  date?: ISODate
+  url?: string
+  site?: string
+  updatedAt: string
+}
+
 /** En middag i veckomenyn. id = datum, så en middag per dag. */
 export interface PlannedDinner {
   id: ISODate
@@ -155,4 +167,5 @@ export interface Backup {
   water: WaterDay[]
   mealPlan: PlannedDinner[]
   sides: PlannedSide[]
+  ratings: DishRating[]
 }

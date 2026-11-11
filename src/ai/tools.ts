@@ -1,6 +1,6 @@
 import { addDays, daysBetween, toISODate } from '../domain/dates'
 import { daysLeft, foodKey } from '../domain/food'
-import type { ChatCard, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import type { ChatCard, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
 /** Det chatten kan läsa. */
 export interface ToolContext {
@@ -11,6 +11,8 @@ export interface ToolContext {
   mealPlan: PlannedDinner[]
   /** Frukost och lunch i veckomenyn. */
   sides?: PlannedSide[]
+  /** Tumme upp/ner på rätter. */
+  ratings?: DishRating[]
   /** Dagens datum (sätts av chatten så att svaren följer appens klocka). */
   today?: string
   /** Klockslaget nu, HH:mm. */
@@ -259,6 +261,7 @@ export function runTool(name: string, args: Args, ctx: ToolContext): ToolOutcome
       return {
         result: {
           dinners: list.map((d) => ({ date: d.date, title: d.title, reason: d.reason || undefined, minutes: d.minutes ?? undefined, portions: d.portions, ...(d.boxes ? { batchCookBoxes: d.boxes } : {}), ingredients: d.ingredients, steps: d.steps })),
+          ...(ctx.ratings?.length ? { liked: ctx.ratings.filter((r) => r.rating === 1).map((r) => r.title), disliked: ctx.ratings.filter((r) => r.rating === -1).map((r) => r.title) } : {}),
           breakfastsAndLunches: (ctx.sides ?? []).filter((x) => x.date >= from && x.date <= to).sort((a, b) => a.id.localeCompare(b.id)).map((x) => ({ date: x.date, meal: x.slot === 'breakfast' ? 'frukost' : 'lunch', title: x.title, ...(x.fromBatch ? { lunchBoxFrom: x.fromBatch } : {}), minutes: x.minutes ?? undefined, ingredients: x.ingredients.length ? x.ingredients : undefined })),
           ...(list.length === 0 ? { note: 'Ingen veckomeny för perioden. Användaren kan göra en under Mat → Meny.' } : {}),
         },

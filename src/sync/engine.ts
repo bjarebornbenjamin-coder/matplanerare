@@ -6,7 +6,7 @@ import type { AppDB } from '../db/db'
  * Konflikter: en lokal osynkad ändring vinner över en inkommande; annars gäller senaste skrivning på servern.
  */
 
-export const COLLECTIONS = ['settings', 'pantry', 'shopping', 'water', 'mealPlan', 'sides'] as const
+export const COLLECTIONS = ['settings', 'pantry', 'shopping', 'water', 'mealPlan', 'sides', 'ratings'] as const
 export type Collection = (typeof COLLECTIONS)[number]
 
 export interface RemoteRow {

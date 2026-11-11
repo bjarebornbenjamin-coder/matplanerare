@@ -63,7 +63,7 @@ function foodPrompt(ctx: ToolContext): string {
   const f = ctx.settings.food
   const n = ctx.settings.nutrition
   return [
-    'Veckomeny: frågar användaren vad det blir till middag, eller vad hen ska äta en dag, anropa först get_meal_plan och utgå från den om något är planerat.',
+    'Veckomeny: frågar användaren vad det blir till middag, eller vad hen ska äta en dag, anropa först get_meal_plan och utgå från den om något är planerat. get_meal_plan ger även liked och disliked (tumme upp/ner): föreslå gärna gillade rätter och aldrig ogillade.',
     'Matlager och inköp: du ser lagret med list_pantry och inköpslistan med list_shopping. På "vad ska jag äta?" eller "vad kan jag laga?": hämta list_pantry och väg ihop: (1) använd i första hand varor som snart går ut (daysLeft 0–2), aldrig utgångna (negativt daysLeft; nämn dem kort), (2) ta hänsyn till klockslaget: sent på kvällen är det ett kvällsmål eller mellanmål, inte en full middag. Räkna inte upp hela lagret; nämn bara de varor du använder.',
     'Recept: skriv ALDRIG egna recept med ingredienser och steg. Anropa find_recipes, som söker upp riktiga recept på nätet och läser ingredienserna från receptsidan: mode "pantry" om användaren vill använda det som finns hemma, "any" om hen gärna handlar, annars "some"; skicka med önskemål i wish (t.ex. "snabbt", "kyckling", "billigt"). Presentera 1–3 träffar kort: namn, varför det passar, vad som saknas, och en egen rad [Öppna receptet](URL) med exakt den url som verktyget gav. Skriv aldrig andra webbadresser. Erbjud propose_shopping_items för det som saknas. Gissa aldrig vad användaren har: är lagret tomt, säg det och föreslå att lägga in varor eller skanna ett kvitto.',
     `Standard är ${f.portions} portioner.${f.allergies.trim() ? ` Allergier/kostönskemål som du måste respektera: ${f.allergies.trim()}.` : ''}`,
@@ -114,6 +114,7 @@ export async function describeError(res: Response): Promise<string> {
   if (res.status === 401) return `${detail || 'Fel lösenord.'} Kontrollera lösenordet i Inställningar.`
   if (res.status === 403) return detail || 'Du har inte åtkomst.'
   if (res.status === 429) return detail || 'För många anrop eller slut på tegoder hos OpenAI.'
+  if ((res.status === 504 || res.status === 502) && !detail) return `AI:n hann inte svara i tid (fel ${res.status}). Försök igen. Händer det ofta: välj en snabbare modell, t.ex. gpt-4o-mini, under Inställningar → AI.`
   if (res.status === 404) return `Modellen hittades inte. Kontrollera modellnamnet i Inställningar.${detail ? ` ${detail}` : ''}`
   return detail ? `Servern svarade med fel ${res.status}: ${detail}` : `Servern svarade med fel ${res.status} utan förklaring. Kontrollera Vercel → Logs och att miljövariablerna är satta.`
 }

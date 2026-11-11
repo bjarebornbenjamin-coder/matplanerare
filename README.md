@@ -34,7 +34,7 @@ OpenAI-anropen går via `/api/chat` och `/api/models`. Nyckeln finns bara som mi
 |---|---|
 | `OPENAI_API_KEY` | Din OpenAI-nyckel (obligatorisk) |
 | `APP_PASSWORD` | **Valfritt.** Lösenord som appen skickar med (`x-app-password`). Skriv in det i Inställningar. Sätter du inget är åtkomsten **öppen**: alla som har webbadressen kan använda din OpenAI-nyckel (med strängare gräns: 10 anrop/min och 100/dygn per besökare, `OPEN_DAILY_LIMIT`). Sätt en utgiftsgräns hos OpenAI om du kör öppet. |
-| `RATE_LIMIT_PER_MIN` | Anrop per minut och användare (standard 20). Gäller per serverinstans, så det är ett skydd mot misstag, inte en exakt kvot. |
+| `RATE_LIMIT_PER_MIN` | Anrop per minut och användare (standard 60; en veckomeny med lunch kan ge ett 20-tal receptsökningar). Gäller per serverinstans, så det är ett skydd mot misstag, inte en exakt kvot. |
 
 Sätt dessutom en utgiftsgräns på nyckeln hos OpenAI. Lokalt: `vercel dev` startar både appen och funktionerna.
 

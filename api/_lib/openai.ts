@@ -26,7 +26,7 @@ export async function guard(req: ApiRequest, env: Env, fetchFn: FetchFn, method:
   if (!env.OPENAI_API_KEY) return errorBody(500, 'Servern saknar OPENAI_API_KEY.')
   const auth = await authorize(req, env, fetchFn)
   if (!auth.ok) return errorBody(auth.status, auth.message)
-  const limit = Number(env.RATE_LIMIT_PER_MIN) || 20
+  const limit = Number(env.RATE_LIMIT_PER_MIN) || 60
   if (auth.open) {
     // Öppen åtkomst: strängare gräns per besökare, och ett dagstak per serverinstans.
     const day = rateLimit(`open-day:${auth.id}`, Number(env.OPEN_DAILY_LIMIT) || 100, Date.now(), 86_400_000)

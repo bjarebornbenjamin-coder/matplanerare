@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { parseBackup } from './backup'
 import { db } from './db'
-import { addChatMessage, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
+import { rateDish, addChatMessage, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
 
 beforeEach(async () => {
-  await Promise.all([db.settings.clear(), db.chat.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear()])
+  await Promise.all([db.settings.clear(), db.chat.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
 })
 
 describe('export och import', () => {
@@ -16,7 +16,7 @@ describe('export och import', () => {
     await db.mealPlan.put({ id: '2026-11-11', date: '2026-11-11', title: 'Pasta carbonara', reason: '', portions: 2, minutes: 25, ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: [], url: 'https://www.ica.se/recept/x/', site: 'ica.se', updatedAt: '' })
     await db.sides.put({ id: '2026-11-12:lunch', date: '2026-11-12', slot: 'lunch', title: 'Pasta carbonara', portions: 1, minutes: null, ingredients: [], fromBatch: '2026-11-11', updatedAt: '' })
     const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear()])
+    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
     await importAll(backup)
     const s = await getSettings()
     expect(s.memories).toEqual(['Gillar inte svamp'])
@@ -104,5 +104,20 @@ describe('vatten', () => {
     expect(await addWater('2026-11-10', -1000)).toBe(0)
     expect(await addWater('2026-11-10', 99_999)).toBe(20_000)
     expect(await db.water.count()).toBe(1)
+  })
+})
+
+describe('betyg på rätter', () => {
+  it('samma rätt oavsett skrivsätt, samma tumme igen tar bort, och följer med i säkerhetskopian', async () => {
+    await db.ratings.clear()
+    await rateDish({ title: 'Pasta Carbonara', date: '2026-11-10', url: 'https://www.ica.se/recept/x/', site: 'ica.se' }, 1)
+    await rateDish({ title: 'pasta  carbonara' }, -1)
+    expect(await db.ratings.toArray()).toMatchObject([{ id: 'pasta carbonara', rating: -1 }])
+    await rateDish({ title: 'Pasta carbonara' }, -1)
+    expect(await db.ratings.count()).toBe(0)
+    await rateDish({ title: 'Tacos' }, 1)
+    const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
+    expect(backup.ratings).toMatchObject([{ id: 'tacos', title: 'Tacos', rating: 1 }])
+    expect(() => parseBackup({ app: 'matplanerare', version: 1, ratings: [{ id: 'x', title: 'X', rating: 5 }] })).toThrow(/betyg/)
   })
 })

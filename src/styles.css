@@ -674,3 +674,21 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 
 .side-link { display: inline-block; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 500; color: var(--primary); text-decoration: none; cursor: pointer; min-height: 32px; }
 .side-link:hover { text-decoration: underline; }
+
+/* Tumme upp/ner */
+.rate-buttons { display: inline-flex; gap: 2px; margin-left: auto; }
+.icon-btn.rate.up { color: #137333; }
+.icon-btn.rate.down { color: #c5221f; }
+:root[data-theme='dark'] .icon-btn.rate.up { color: #81c995; }
+:root[data-theme='dark'] .icon-btn.rate.down { color: #f28b82; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .icon-btn.rate.up { color: #81c995; }
+  :root:not([data-theme='light']) .icon-btn.rate.down { color: #f28b82; }
+}
+.past-list { border-radius: 18px; background: var(--surface-2, var(--surface)); padding: 4px 8px 4px 16px; }
+.past-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--outline); }
+.past-row:last-child { border-bottom: 0; }
+.past-body { flex: 1; min-width: 0; }
+.past-title { font-weight: 500; }
+.past-title a { color: inherit; text-decoration: none; }
+.past-title a:hover { text-decoration: underline; }

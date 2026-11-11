@@ -1,5 +1,5 @@
 import { DEFAULT_FOOD, DEFAULT_NUTRITION } from './repo'
-import type { Backup, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import type { Backup, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
 const fail = (msg: string): never => {
   throw new Error(`Ogiltig säkerhetskopia: ${msg}`)
@@ -120,6 +120,18 @@ function parseSide(v: unknown): PlannedSide {
   }
 }
 
+function parseRating(v: unknown): DishRating {
+  if (!isObj(v) || !isStr(v.id) || !v.id || !isStr(v.title) || !v.title.trim() || (v.rating !== 1 && v.rating !== -1)) return fail('betyg på en rätt')
+  return {
+    id: v.id.slice(0, 100),
+    title: v.title.slice(0, 100),
+    rating: v.rating,
+    ...(isDate(v.date) ? { date: v.date as string } : {}),
+    ...(isStr(v.url) && v.url.startsWith('https://') ? { url: v.url.slice(0, 500), ...(isStr(v.site) ? { site: v.site.slice(0, 60) } : {}) } : {}),
+    updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
+  }
+}
+
 export function parseBackup(json: unknown): Backup {
   if (!isObj(json) || json.app !== 'matplanerare') return fail('filen kommer inte från Matplaneraren')
   if (json.version !== 1) return fail(`okänd version (${String(json.version)})`)
@@ -134,5 +146,6 @@ export function parseBackup(json: unknown): Backup {
     water: list(json.water, parseWater),
     mealPlan: list(json.mealPlan, parseDinner),
     sides: list(json.sides, parseSide),
+    ratings: list(json.ratings, parseRating),
   }
 }

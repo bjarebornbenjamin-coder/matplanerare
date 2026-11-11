@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { AiConfig, ChatMessage, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import type { AiConfig, ChatMessage, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
 
 export class AppDB extends Dexie {
   settings!: Table<Settings, string>
@@ -11,6 +11,8 @@ export class AppDB extends Dexie {
   mealPlan!: Table<PlannedDinner, string>
   /** Frukost och lunch i veckomenyn. */
   sides!: Table<PlannedSide, string>
+  /** Tumme upp/ner på rätter. */
+  ratings!: Table<DishRating, string>
   /** Lokala, osynkade inställningar per enhet (t.ex. bakgrundsbild). */
   local!: Table<{ key: string; value: string; updatedAt: string }, string>
   /** Synk: innehållets hash vid senaste synk, per post. */
@@ -35,6 +37,7 @@ export class AppDB extends Dexie {
     // Kost-loggningen (kalorier och makron) är borttagen.
     this.version(2).stores({ meals: null })
     this.version(3).stores({ sides: 'id, date' })
+    this.version(4).stores({ ratings: 'id' })
   }
 }
 

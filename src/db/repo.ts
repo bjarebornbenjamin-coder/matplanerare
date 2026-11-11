@@ -214,18 +214,42 @@ export async function exportAll(): Promise<Backup> {
     water: await db.water.toArray(),
     mealPlan: await db.mealPlan.toArray(),
     sides: await db.sides.toArray(),
+    ratings: await db.ratings.toArray(),
   }
 }
 
 /** Ersätter all data med innehållet i säkerhetskopian. */
 export async function importAll(backup: Backup): Promise<void> {
-  await db.transaction('rw', [db.settings, db.pantry, db.shopping, db.water, db.mealPlan, db.sides], async () => {
-    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear()])
+  await db.transaction('rw', [db.settings, db.pantry, db.shopping, db.water, db.mealPlan, db.sides, db.ratings], async () => {
+    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
     if (backup.settings) await db.settings.put(backup.settings)
     await db.pantry.bulkPut(backup.pantry)
     await db.shopping.bulkPut(backup.shopping)
     await db.water.bulkPut(backup.water)
     await db.mealPlan.bulkPut(backup.mealPlan)
     await db.sides.bulkPut(backup.sides)
+    await db.ratings.bulkPut(backup.ratings)
+  })
+}
+
+/** Nyckel för en rätt, så att "Pasta Carbonara" och "pasta carbonara" blir samma. */
+export const dishId = (title: string) => title.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 100)
+
+/** Sätter tumme upp/ner på en rätt; samma tumme igen tar bort betyget. */
+export async function rateDish(dish: { title: string; date?: string; url?: string; site?: string }, rating: 1 | -1): Promise<void> {
+  const id = dishId(dish.title)
+  if (!id) return
+  const existing = await db.ratings.get(id)
+  if (existing?.rating === rating) {
+    await db.ratings.delete(id)
+    return
+  }
+  await db.ratings.put({
+    id,
+    title: dish.title.trim().slice(0, 100),
+    rating,
+    ...(dish.date ? { date: dish.date } : {}),
+    ...(dish.url ? { url: dish.url, ...(dish.site ? { site: dish.site } : {}) } : {}),
+    updatedAt: new Date().toISOString(),
   })
 }

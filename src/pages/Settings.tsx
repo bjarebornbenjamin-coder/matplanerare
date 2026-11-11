@@ -11,9 +11,10 @@ import { imageToDataUrl } from '../lib/image'
 import { authHeaders } from '../lib/auth'
 import { parseBackup } from '../db/backup'
 import { exportAll, importAll, saveAiConfig, saveSettings } from '../db/repo'
+import { db } from '../db/db'
 import { toISODate } from '../domain/dates'
 import type { Theme } from '../domain/types'
-import { useAiConfig, useFieldError, useSettings } from '../hooks'
+import { useAiConfig, useFieldError, useRatings, useSettings } from '../hooks'
 
 const THEMES: { value: Theme; label: string }[] = [
   { value: 'system', label: 'Som enheten' },
@@ -205,6 +206,38 @@ function WaterSection() {
   )
 }
 
+function RatingsSection() {
+  const ratings = useRatings()
+  if (!ratings) return null
+  const group = (rating: 1 | -1, title: string) => {
+    const list = ratings.filter((r) => r.rating === rating).sort((a, b) => a.title.localeCompare(b.title, 'sv'))
+    return (
+      <>
+        <h2>{title} ({list.length})</h2>
+        {list.length === 0 ? <p className="empty">Inga än.</p> : (
+          <div className="settings-list">
+            {list.map((r) => (
+              <div key={r.id} className="settings-row">
+                <span><span className="title">{r.title}</span>{r.site && <span className="sub">{r.site}</span>}</span>
+                <button type="button" className="icon-btn" aria-label={`Ta bort betyget för ${r.title}`} onClick={() => db.ratings.delete(r.id)}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    )
+  }
+  return (
+    <>
+      <p className="muted">Gillade rätter kommer gärna tillbaka i menyn; rätter du inte gillade föreslås aldrig igen. Sätt betyg med tummarna i Meny.</p>
+      {group(1, 'Gillar')}
+      {group(-1, 'Gillar inte')}
+    </>
+  )
+}
+
 function MemorySection() {
   const settings = useSettings()
   const [fact, setFact] = useState('')
@@ -244,6 +277,7 @@ export function SettingsPage() {
   const session = useSession()
   const notify = useNotifyStatus()
   const background = useBackground()
+  const ratings = useRatings()
   const fileRef = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
   if (!settings) return null
@@ -293,6 +327,7 @@ export function SettingsPage() {
     notiser: { title: 'Notiser', body: <NotifySection /> },
     ai: { title: 'AI-assistent', body: <AiSection /> },
     minne: { title: 'Assistentens minne', body: <MemorySection /> },
+    betyg: { title: 'Betyg på rätter', body: <RatingsSection /> },
     sakerhetskopia: {
       title: 'Säkerhetskopia',
       body: (
@@ -340,6 +375,7 @@ export function SettingsPage() {
       title: 'AI',
       rows: [
         { to: 'ai', title: 'AI-assistent', status: `${config?.model ?? DEFAULT_MODEL}${config?.password ? ', lösenord sparat' : ''}` },
+        { to: 'betyg', title: 'Betyg på rätter', status: ratings?.length ? `${ratings.filter((r) => r.rating === 1).length} gillade, ${ratings.filter((r) => r.rating === -1).length} ogillade` : 'Inga än' },
         { to: 'minne', title: 'Assistentens minne', status: settings.memories.length ? `${settings.memories.length} ${settings.memories.length === 1 ? 'sak' : 'saker'}` : 'Inget sparat' },
       ],
     },
