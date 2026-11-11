@@ -59,10 +59,16 @@ const MODE_TEXT: Record<Mode, string> = {
   any: 'Det går bra att handla allt som behövs. Använd gärna det som finns hemma, men det är inget krav.',
 }
 
+/**
+ * Hur många receptsidor modellen ska leta upp. Fler än som behövs, eftersom en del sidor inte
+ * går att hämta eller läsa; servern tar de första som verkligen är recept.
+ */
+export const candidateCount = (count: number) => Math.min(6, count + 3)
+
 export function searchPrompt(b: Body): string {
   return [
-    `Hitta ${b.count} riktiga recept på svenska receptsajter (helst ica.se, koket.se, arla.se, coop.se, tasteline.com) och svara med webbadressen till varje receptsida.`,
-    b.dish ? `Rätten ska vara: ${b.dish}.` : MODE_TEXT[b.mode],
+    `Hitta ${candidateCount(b.count)} olika riktiga receptsidor på svenska receptsajter (helst ica.se, koket.se, arla.se, coop.se, tasteline.com, gärna från olika sajter) och svara med webbadressen till varje receptsida.`,
+    b.dish ? `Alla ska vara recept på rätten: ${b.dish} (eller en mycket nära variant med i stort sett samma namn).` : MODE_TEXT[b.mode],
     b.dish ? '' : 'Använd i första hand varor som snart går ut (daysLeft 0–2). Välj olika sorters rätter.',
     b.wish ? `Önskemål: ${b.wish}.` : '',
     b.allergies ? `Allergier/kost som måste respekteras: ${b.allergies}.` : '',
@@ -267,7 +273,7 @@ export async function findRecipes(b: Body, env: Env, fetchFn: FetchFn): Promise<
   const unique = candidates
     .map((c) => ({ ...c, u: safeUrl(c.url) }))
     .filter((c): c is typeof c & { u: URL } => c.u !== null && !seen.has(c.u.toString()) && Boolean(seen.add(c.u.toString())))
-    .slice(0, 8)
+    .slice(0, 10)
 
   const pages = await Promise.all(unique.map(async (c) => ({ c, html: await fetchPage(c.u, fetchFn) })))
   const recipes: FoundRecipe[] = []

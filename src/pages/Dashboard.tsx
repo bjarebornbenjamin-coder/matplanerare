@@ -50,7 +50,7 @@ export function Dashboard() {
             <div className="tonight-title">{tonight.title}</div>
             <div className="tonight-meta">
               {tonight.minutes !== null && <span>{tonight.minutes} min</span>}
-              <span>{lacking ? `${lacking} saknas` : 'Allt finns hemma'}</span>
+              {tonight.url ? <span>{lacking ? `${lacking} saknas` : 'Allt finns hemma'}</span> : <span>Receptet saknas</span>}
             </div>
             <div className="tonight-actions">
               {tonight.url ? (

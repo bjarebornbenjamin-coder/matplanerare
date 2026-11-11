@@ -28,7 +28,8 @@ describe('receptsidor', () => {
     const b = parseBody({ mode: 'pantry', pantry: [{ name: 'Kyckling', daysLeft: 1 }] })!
     expect(searchPrompt(b)).toMatch(/Inget annat får behöva köpas/)
     expect(searchPrompt({ ...b, mode: 'any' })).toMatch(/handla allt/)
-    expect(searchPrompt({ ...b, dish: 'Lasagne' })).toMatch(/Rätten ska vara: Lasagne/)
+    expect(searchPrompt({ ...b, dish: 'Lasagne' })).toMatch(/recept på rätten: Lasagne/)
+    expect(searchPrompt({ ...b, count: 1 })).toMatch(/Hitta 4 olika/)
     expect(parseBody({ mode: 'fel' })).toBeNull()
   })
 })

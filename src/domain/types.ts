@@ -89,6 +89,9 @@ export interface PlannedSide {
   ingredients: { name: string; amount: string }[]
   /** Matlåda från storkoket det datumet; har inga egna ingredienser. */
   fromBatch?: ISODate
+  /** Riktigt recept från nätet (luncher); då är ingredienserna receptsidans. */
+  url?: string
+  site?: string
   updatedAt: string
 }
 

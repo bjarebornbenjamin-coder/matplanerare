@@ -60,6 +60,24 @@ export async function findRecipes(q: RecipeQuery, headers: Record<string, string
   return data.recipes
 }
 
+/**
+ * Ett riktigt recept för rätten. Hittas ingen läsbar receptsida för just den rätten provas en
+ * liknande rätt, och då byts namnet mot receptets. null om inget recept alls hittas: då ska
+ * rätten inte visas som ett recept.
+ */
+export async function recipeForDish(dish: string, q: Omit<RecipeQuery, 'mode' | 'dish' | 'count' | 'wish'>, headers: Record<string, string>, fetchFn: typeof fetch = fetch): Promise<FoundRecipe | null> {
+  try {
+    return (await findRecipes({ ...q, mode: 'any', dish, count: 1 }, headers, fetchFn))[0]
+  } catch {
+    /* prova en liknande rätt */
+  }
+  try {
+    return (await findRecipes({ ...q, mode: 'any', wish: `${dish}, eller en liknande rätt`, count: 1 }, headers, fetchFn))[0]
+  } catch {
+    return null
+  }
+}
+
 const UNIT = '(?:kg|hg|g|l|dl|cl|ml|msk|tsk|krm|st|förp|förpackning(?:ar)?|paket|burk(?:ar)?|klyft(?:a|or)|skiv(?:a|or)|kruk(?:a|or)|knippe|näve|nypa)'
 const SPLIT = new RegExp(`^((?:ca\\.?\\s*)?[\\d½¼¾⅓⅔.,/–-]+(?:\\s*[\\d½¼¾⅓⅔.,/–-]+)?\\s*(?:${UNIT}\\.?)?)\\s+(.+)$`, 'i')
 

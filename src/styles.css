@@ -671,3 +671,6 @@ html { scroll-behavior: smooth; scroll-padding-top: 16px; }
 .muted-title { color: var(--muted); font-weight: 500; }
 h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin: 16px 0 4px; }
 @media (min-width: 560px) { .sides { margin-left: 66px; } }
+
+.side-link { display: inline-block; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 500; color: var(--primary); text-decoration: none; cursor: pointer; min-height: 32px; }
+.side-link:hover { text-decoration: underline; }

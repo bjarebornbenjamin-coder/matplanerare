@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findRecipes, ingredientStatuses, splitIngredient } from './recipeSearch'
+import { findRecipes, ingredientStatuses, splitIngredient, recipeForDish } from './recipeSearch'
 import type { PantryItem } from '../domain/types'
 
 const pantry: PantryItem[] = [
@@ -27,5 +27,30 @@ describe('receptsökning i appen', () => {
     expect(r[0].title).toBe('Kycklinggryta')
     expect(sent).toMatchObject({ mode: 'pantry', allergies: 'nötter', wish: 'snabbt', count: 3 })
     expect(sent.pantry).toEqual([{ name: 'Kycklingfilé' }])
+  })
+})
+
+describe('recipeForDish', () => {
+  const q = { pantry: [], food: { allergies: '' }, memories: [], today: '2026-11-11' }
+  const recipe = { title: 'Kikärtsgryta med spenat', url: 'https://www.ica.se/recept/kikartsgryta/', site: 'ica.se', why: '', ingredients: ['400 g kikärtor'] }
+  const respond = (ok: boolean) => (ok ? new Response(JSON.stringify({ recipes: [recipe] }), { status: 200 }) : new Response(JSON.stringify({ error: 'Hittade inga receptsidor som gick att läsa.' }), { status: 404 }))
+
+  it('tar en liknande rätt när ingen sida för rätten går att läsa', async () => {
+    const bodies: Record<string, unknown>[] = []
+    const fetchFn = (async (_u: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)))
+      return respond(bodies.length === 2)
+    }) as typeof fetch
+    expect(await recipeForDish('Chana masala med ris', q, {}, fetchFn)).toEqual(recipe)
+    expect(bodies[0]).toMatchObject({ dish: 'Chana masala med ris', count: 1, mode: 'any' })
+    expect(bodies[1].dish).toBeUndefined()
+    expect(bodies[1].wish).toMatch(/Chana masala med ris, eller en liknande rätt/)
+  })
+
+  it('ger null när inget recept alls hittas, och frågar inte två gånger när det första går', async () => {
+    expect(await recipeForDish('X', q, {}, (async () => respond(false)) as unknown as typeof fetch)).toBeNull()
+    let calls = 0
+    await recipeForDish('Lasagne', q, {}, (async () => { calls++; return respond(true) }) as unknown as typeof fetch)
+    expect(calls).toBe(1)
   })
 })

@@ -115,6 +115,7 @@ function parseSide(v: unknown): PlannedSide {
     minutes: num(v.minutes, 0, 600) ?? null,
     ingredients,
     ...(isDate(v.fromBatch) ? { fromBatch: v.fromBatch as string } : {}),
+    ...(isStr(v.url) && v.url.startsWith('https://') ? { url: v.url.slice(0, 500), ...(isStr(v.site) ? { site: v.site.slice(0, 60) } : {}) } : {}),
     updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
   }
 }
