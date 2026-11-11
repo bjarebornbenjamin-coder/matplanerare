@@ -20,7 +20,7 @@ export async function callVision(
 ): Promise<string> {
   let res: Response
   try {
-    res = await fetchFn('/api/chat', {
+    res = await fetchFn('/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...o.headers },
       body: JSON.stringify({ model: o.model, messages: visionMessages(o.system, o.text, o.image), response_format: { type: 'json_object' } }),

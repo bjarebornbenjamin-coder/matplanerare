@@ -274,7 +274,7 @@ export async function fetchVariedMealPlan(input: MealPlanInput, model: string, h
 export async function fetchMealPlan(input: MealPlanInput, model: string, headers: Record<string, string>, fetchFn: typeof fetch = fetch): Promise<{ dinners: PlannedDinner[]; sides: PlannedSide[] }> {
   let res: Response
   try {
-    res = await fetchFn('/api/chat', {
+    res = await fetchFn('/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({

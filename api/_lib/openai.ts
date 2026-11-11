@@ -8,15 +8,13 @@ const MAX_MESSAGES = 80
 const MODEL = /^[\w.:-]{1,64}$/
 
 /** Skickar bara vidare de fält appen behöver, så att servern inte kan missbrukas till annat. */
-export function sanitizeChatBody(body: unknown): { ok: true; value: Record<string, unknown> } | { ok: false; message: string } {
+export function sanitizeAiBody(body: unknown): { ok: true; value: Record<string, unknown> } | { ok: false; message: string } {
   if (typeof body !== 'object' || body === null) return { ok: false, message: 'Ogiltig förfrågan.' }
   const b = body as Record<string, unknown>
   if (typeof b.model !== 'string' || !MODEL.test(b.model)) return { ok: false, message: 'Ogiltigt modellnamn.' }
   if (!Array.isArray(b.messages) || b.messages.length === 0 || b.messages.length > MAX_MESSAGES) return { ok: false, message: 'Ogiltiga meddelanden.' }
   if (JSON.stringify(b).length > MAX_BODY_BYTES) return { ok: false, message: 'Förfrågan är för stor.' }
   const value: Record<string, unknown> = { model: b.model, messages: b.messages }
-  if (Array.isArray(b.tools)) value.tools = b.tools
-  if (b.tool_choice !== undefined) value.tool_choice = b.tool_choice
   if (b.response_format !== undefined) value.response_format = b.response_format
   return { ok: true, value }
 }
@@ -54,10 +52,10 @@ async function forward(url: string, init: RequestInit, fetchFn: FetchFn): Promis
   return json(res.status, body)
 }
 
-export async function handleChat(req: ApiRequest, env: Env, fetchFn: FetchFn = fetch): Promise<ApiResponse> {
+export async function handleAi(req: ApiRequest, env: Env, fetchFn: FetchFn = fetch): Promise<ApiResponse> {
   const g = await guard(req, env, fetchFn, 'POST')
   if ('status' in g) return g
-  const clean = sanitizeChatBody(req.body)
+  const clean = sanitizeAiBody(req.body)
   if (!clean.ok) return errorBody(400, clean.message)
   return forward(
     `${OPENAI}/chat/completions`,

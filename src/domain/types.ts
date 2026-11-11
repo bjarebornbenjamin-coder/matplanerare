@@ -129,7 +129,7 @@ export interface PlannedDinner {
 /** Sparas bara lokalt och ingår aldrig i export. OpenAI-nyckeln finns bara på servern. */
 export interface AiConfig {
   id: 'main'
-  /** Lösenord till appens server (api/chat och api/recipes). */
+  /** Lösenord till appens server (api/ai och api/recipes). */
   password: string
   model: string
   /** Senast hämtade modelllista från OpenAI. */

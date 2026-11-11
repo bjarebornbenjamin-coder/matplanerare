@@ -27,7 +27,7 @@ Vercel: Import Project från GitHub-repot. Inga inställningar behövs (Vite det
 
 ## Server (Vercel-funktioner i `api/`)
 
-OpenAI-anropen går via `/api/chat` och `/api/models`. Nyckeln finns bara som miljövariabel på servern.
+OpenAI-anropen går via `/api/ai` (veckomeny och bildläsning), `/api/recipes` (receptsökning) och `/api/models`. Nyckeln finns bara som miljövariabel på servern.
 
 | Variabel | Syfte |
 |---|---|
