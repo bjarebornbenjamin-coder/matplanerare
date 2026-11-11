@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { addWater } from '../db/repo'
+import { httpsUrl } from '../domain/recipeLink'
 import { withPantryStatus } from '../ai/recipes'
 import { WEEKDAYS_SHORT, addDays, parseISODate, toISODate, weekdayOf } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
@@ -54,7 +55,7 @@ export function Dashboard() {
             </div>
             <div className="tonight-actions">
               {tonight.url ? (
-                <a className="btn on-hero" href={tonight.url} target="_blank" rel="noreferrer">Öppna receptet</a>
+                <a className="btn on-hero" href={httpsUrl(tonight.url)} target="_blank" rel="noreferrer">Öppna receptet</a>
               ) : (
                 <a className="btn on-hero" href={`#middag-${tonight.date}`}>Visa middagen</a>
               )}

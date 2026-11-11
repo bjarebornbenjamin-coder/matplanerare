@@ -33,7 +33,15 @@ OpenAI-anropen går via `/api/ai` (veckomeny och bildläsning), `/api/recipes` (
 |---|---|
 | `OPENAI_API_KEY` | Din OpenAI-nyckel (obligatorisk) |
 | `APP_PASSWORD` | **Valfritt.** Lösenord som appen skickar med (`x-app-password`). Skriv in det i Inställningar. Sätter du inget är åtkomsten **öppen**: alla som har webbadressen kan använda din OpenAI-nyckel (med strängare gräns: 10 anrop/min och 100/dygn per besökare, `OPEN_DAILY_LIMIT`). Sätt en utgiftsgräns hos OpenAI om du kör öppet. |
-| `RATE_LIMIT_PER_MIN` | Anrop per minut och användare (standard 60; en veckomeny med lunch kan ge ett 20-tal receptsökningar). Gäller per serverinstans, så det är ett skydd mot misstag, inte en exakt kvot. |
+| `ALLOWED_MODELS` | **Valfritt.** Kommaseparerade modeller som `/api/ai` får använda. Standard: `gpt-4o-mini, gpt-4o, gpt-4.1-nano, gpt-4.1-mini, gpt-4.1, gpt-5-nano, gpt-5-mini, gpt-5`. Andra modeller nekas, och modellistan i appen visar bara dessa. |
+
+**Begränsningar på servern**
+
+- `/api/ai` skickar bara vidare `model`, `messages` (roll och text/bild) och `response_format` (`json_object` eller `text`). Allt annat (t.ex. `tools`, `stream`, `max_tokens`) tas bort, och servern sätter själv taket `max_completion_tokens: 6000`.
+- **Hastighetsbegränsning per användare** (429 med `Retry-After` när gränsen nås): AI 10/min och 150/dygn, recept 30/min och 400/dygn, modellistan 10/min och 200/dygn, testnotis 5/min. Räknaren ligger i Supabase och gäller över alla Vercel-instanser; **kör `supabase/rate_limits.sql` en gång** i SQL Editor. Innan den körts gäller bara en gräns per serverinstans (och en varning skrivs i Vercels loggar).
+- `/api/recipes` hämtar bara receptsidor över https på port 443. Domännamnet slås upp och alla adresser måste vara publika (inga 127.0.0.1, 10.x, 192.168.x, 169.254.169.254 osv.); anslutningen görs till den kontrollerade adressen, och omdirigeringar följs högst 3 gånger med samma kontroll. Klienten kan inte skicka med egna adresser.
+- `GET /api/health` svarar bara `{"ok":true}`. Detaljerna för "Testa anslutningen" (`POST`) kräver inloggning eller lösenord, och kontrollen mot OpenAI sparas i 5 minuter.
+- Alla sidor skickas med `Content-Security-Policy` (bara egen kod, Google Fonts och Supabase), `X-Frame-Options: DENY` och `frame-ancestors 'none'` (går inte att lägga i en iframe), `X-Content-Type-Options: nosniff` och `Referrer-Policy: strict-origin-when-cross-origin` (se `vercel.json`).
 
 Sätt dessutom en utgiftsgräns på nyckeln hos OpenAI. Lokalt: `vercel dev` startar både appen och funktionerna.
 
@@ -42,7 +50,7 @@ Sätt dessutom en utgiftsgräns på nyckeln hos OpenAI. Lokalt: `vercel dev` sta
 Lokalt först: allt fungerar offline i IndexedDB. När du loggar in synkas meny (middag, frukost och lunch), betyg på rätter, matlager, inköpslista, vatten och inställningar mot Supabase. Lösenordet synkas inte.
 
 1. Skapa ett projekt på supabase.com.
-2. SQL Editor: kör innehållet i `supabase/schema.sql` (tabell + Row Level Security).
+2. SQL Editor: kör innehållet i `supabase/schema.sql` (tabell + Row Level Security) och sedan `supabase/rate_limits.sql` (hastighetsbegränsning för AI-anropen).
 3. Authentication → Providers → Email: stäng av "Confirm email" om du vill kunna logga in direkt efter att du skapat kontot.
 4. Lägg i Vercel (Environment Variables) och bygg om:
    - `VITE_SUPABASE_URL` och `VITE_SUPABASE_ANON_KEY` (Project Settings → API; anon-nyckeln är publik och skyddas av Row Level Security)

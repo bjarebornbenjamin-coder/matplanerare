@@ -31,6 +31,8 @@ describe('receptsidor', () => {
     expect(searchPrompt({ ...b, dish: 'Lasagne' })).toMatch(/recept på rätten: Lasagne/)
     expect(searchPrompt({ ...b, count: 1 })).toMatch(/Hitta 4 olika/)
     expect(parseBody({ mode: 'fel' })).toBeNull()
+    // Ett url-fält från klienten tas aldrig med: bara adresser från sökningen hämtas.
+    expect(parseBody({ mode: 'any', url: 'http://169.254.169.254/', page: 'https://intern' })).not.toHaveProperty('url')
   })
 })
 
@@ -52,17 +54,23 @@ describe('/api/recipes', () => {
       if (url === 'https://www.koket.se/kycklinggryta') return new Response(page({ '@type': 'Recipe', name: 'Kycklinggryta', recipeIngredient: ['500 g kycklingfilé'] }), { headers: { 'content-type': 'text/html; charset=utf-8' } })
       return new Response('Not found', { status: 404 })
     }) as unknown as typeof fetch
-    const res = await handleRecipeSearch({ method: 'POST', headers: { 'x-app-password': 'pw' }, body: { mode: 'some', pantry: [{ name: 'Ägg' }] }, ip: '1' }, env, fetchFn)
+    // Sidorna hämtas via den skyddade hämtaren; här byts den mot fetchFn så att inget går ut på nätet.
+    const getPage = async (u: URL) => {
+      const r = await fetchFn(u.toString())
+      return r.ok ? r.text() : null
+    }
+    const res = await handleRecipeSearch({ method: 'POST', headers: { 'x-app-password': 'pw' }, body: { mode: 'some', pantry: [{ name: 'Ägg' }], url: 'http://169.254.169.254/' }, ip: '1' }, env, fetchFn, getPage)
     expect(res.status).toBe(200)
     const { recipes } = res.body as { recipes: { title: string; url: string; site: string; why: string; ingredients: string[] }[] }
     expect(recipes.map((r) => [r.title, r.site, r.why])).toEqual([['Pasta carbonara', 'ica.se', 'Använder äggen'], ['Kycklinggryta', 'koket.se', '']])
     expect(calls).not.toContain('http://localhost/x')
+    expect(calls.some((c) => c.includes('169.254'))).toBe(false) // ett url-fält i förfrågan används aldrig
     expect(bodies.map((b) => `${b.model}/${b.tools[0].type}`)).toEqual(['gpt-4.1-mini/web_search', 'gpt-4.1-mini/web_search_preview'])
   })
   it('kräver lösenord och ger 404 när inget gick att läsa', async () => {
     const f = (async (url: string) => (url.includes('openai') ? new Response(JSON.stringify({ output_text: '{"recipes":[]}' })) : new Response(''))) as unknown as typeof fetch
     expect((await handleRecipeSearch({ method: 'POST', headers: {}, body: { mode: 'any' }, ip: '1' }, env, f)).status).toBe(401)
-    expect((await handleRecipeSearch({ method: 'POST', headers: { 'x-app-password': 'pw' }, body: { mode: 'any' }, ip: '1' }, env, f)).status).toBe(404)
+    expect((await handleRecipeSearch({ method: 'POST', headers: { 'x-app-password': 'pw' }, body: { mode: 'any' }, ip: '1' }, env, f, async () => null)).status).toBe(404)
     // Fel nyckel provas inte om med andra modeller, och felet blir 502 (inte "modellen hittades inte").
     let n = 0
     const bad = (async () => (n++, new Response(JSON.stringify({ error: { message: 'Incorrect API key' } }), { status: 401 }))) as unknown as typeof fetch

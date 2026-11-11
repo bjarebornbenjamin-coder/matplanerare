@@ -1,7 +1,8 @@
 import { timingSafeEqual } from 'node:crypto'
 import { header, type ApiRequest, type Env, type FetchFn } from './types.js'
 
-export type AuthResult = { ok: true; id: string; email?: string; open?: boolean } | { ok: false; status: number; message: string }
+/** token = användarens Supabase-token, för hastighetsbegränsningen i databasen. */
+export type AuthResult = { ok: true; id: string; email?: string; open?: boolean; token?: string } | { ok: false; status: number; message: string }
 
 function safeEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a)
@@ -33,7 +34,10 @@ export async function verifySupabaseUser(
 
 export async function authorize(req: ApiRequest, env: Env, fetchFn: FetchFn): Promise<AuthResult> {
   const bearer = /^Bearer\s+(.+)$/i.exec(header(req, 'authorization'))?.[1]
-  if (bearer) return verifySupabaseUser(bearer, env, fetchFn)
+  if (bearer) {
+    const user = await verifySupabaseUser(bearer, env, fetchFn)
+    return user.ok ? { ...user, token: bearer } : user
+  }
 
   // Varken lösenord eller inloggning konfigurerat: öppen åtkomst, begränsad per besökare i openai.ts.
   if (!env.APP_PASSWORD && !env.SUPABASE_URL) {

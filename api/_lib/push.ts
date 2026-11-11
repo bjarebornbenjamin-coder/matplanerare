@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import * as webpush from 'web-push'
 import { verifySupabaseUser } from './auth.js'
-import { rateLimit } from './rateLimit.js'
+import { LIMITS, rateLimit, sharedRateLimit, tooMany } from './rateLimit.js'
 import { errorBody, header, json, type ApiRequest, type ApiResponse, type Env, type FetchFn } from './types.js'
 
 export interface Sub {
@@ -157,8 +157,10 @@ export async function handleTest(req: ApiRequest, env: Env, deps: PushDeps = {})
   if (!user.ok) return errorBody(user.status, user.message)
   const missing = configured(env)
   if (missing) return errorBody(500, missing)
-  const rl = rateLimit(`test:${user.id}`, 5)
-  if (!rl.ok) return errorBody(429, `För många försök. Vänta ${rl.retryAfter} sekunder.`)
+  const rl = rateLimit(`push:${user.id}`, LIMITS.push.perMinute)
+  if (!rl.ok) return tooMany(rl.retryAfter)
+  const wait = await sharedRateLimit('push', bearer, env, deps.fetchFn ?? fetch)
+  if (wait) return tooMany(wait)
   const store = deps.store ?? supabaseStore(env, deps.fetchFn)
   const send = deps.send ?? webPushSender(env)
   const subs = await store.subscriptions(user.id.replace(/^user:/, ''))

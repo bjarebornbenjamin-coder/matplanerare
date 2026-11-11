@@ -1,4 +1,5 @@
 import { OPENAI, guard } from './openai.js'
+import { allowedTarget, fetchPublicPage } from './safeFetch.js'
 import { errorBody, json, type ApiRequest, type ApiResponse, type Env, type FetchFn } from './types.js'
 
 /**
@@ -81,7 +82,7 @@ export function searchPrompt(b: Body): string {
     .join('\n')
 }
 
-/** Bara vanliga publika https-adresser, så att servern inte kan fås att hämta interna adresser. */
+/** Bara vanliga https-adresser. Att värden verkligen är publik kontrolleras efter DNS-uppslaget i fetchPublicPage. */
 export function safeUrl(raw: string): URL | null {
   let u: URL
   try {
@@ -89,9 +90,7 @@ export function safeUrl(raw: string): URL | null {
   } catch {
     return null
   }
-  if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return null
-  const h = u.hostname.toLowerCase()
-  if (!h.includes('.') || h.endsWith('.local') || h.endsWith('.internal') || h === 'localhost' || /^[\d.]+$/.test(h) || h.includes(':')) return null
+  if (!allowedTarget(u)) return null
   for (const p of [...u.searchParams.keys()]) if (p.startsWith('utm_')) u.searchParams.delete(p)
   u.hash = ''
   return u
@@ -165,22 +164,24 @@ export function recipeFromHtml(html: string): Omit<FoundRecipe, 'url' | 'site' |
   return null
 }
 
-async function fetchPage(url: URL, fetchFn: FetchFn): Promise<string | null> {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS)
+export type PageFetcher = (url: URL) => Promise<string | null>
+
+/**
+ * Hämtar en receptsida via fetchPublicPage: bara https, aldrig interna adresser (kontrolleras efter
+ * DNS-uppslaget och för varje omdirigering), högst 8 sekunder och 3 MB.
+ */
+export const fetchPage: PageFetcher = async (url) => {
   try {
-    const res = await fetchFn(url.toString(), {
-      signal: ctrl.signal,
-      redirect: 'follow',
+    const r = await fetchPublicPage(url, {
+      timeoutMs: PAGE_TIMEOUT_MS,
+      maxBytes: MAX_PAGE_BYTES,
+      maxRedirects: 3,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Matplaneraren/1.0; personlig receptsökning)', Accept: 'text/html', 'Accept-Language': 'sv-SE,sv;q=0.9' },
     })
-    if (!res.ok || !(res.headers.get('content-type') ?? 'text/html').includes('html')) return null
-    const text = await res.text()
-    return text.length > MAX_PAGE_BYTES ? text.slice(0, MAX_PAGE_BYTES) : text
+    if (!r || r.status < 200 || r.status >= 300 || !(r.contentType || 'text/html').includes('html')) return null
+    return r.body
   } catch {
     return null
-  } finally {
-    clearTimeout(timer)
   }
 }
 
@@ -262,7 +263,7 @@ async function webSearch(prompt: string, env: Env, fetchFn: FetchFn): Promise<Se
   return { error: `Receptsökningen misslyckades: ${last}` }
 }
 
-export async function findRecipes(b: Body, env: Env, fetchFn: FetchFn): Promise<ApiResponse> {
+export async function findRecipes(b: Body, env: Env, fetchFn: FetchFn, getPage: PageFetcher = fetchPage): Promise<ApiResponse> {
   const found = await webSearch(searchPrompt(b), env, fetchFn)
   if ('error' in found) return errorBody(502, found.error)
   const candidates = parseCandidates(found.text)
@@ -275,7 +276,7 @@ export async function findRecipes(b: Body, env: Env, fetchFn: FetchFn): Promise<
     .filter((c): c is typeof c & { u: URL } => c.u !== null && !seen.has(c.u.toString()) && Boolean(seen.add(c.u.toString())))
     .slice(0, 10)
 
-  const pages = await Promise.all(unique.map(async (c) => ({ c, html: await fetchPage(c.u, fetchFn) })))
+  const pages = await Promise.all(unique.map(async (c) => ({ c, html: await getPage(c.u) })))
   const recipes: FoundRecipe[] = []
   for (const { c, html } of pages) {
     const r = html ? recipeFromHtml(html) : null
@@ -287,10 +288,10 @@ export async function findRecipes(b: Body, env: Env, fetchFn: FetchFn): Promise<
   return json(200, { recipes })
 }
 
-export async function handleRecipeSearch(req: ApiRequest, env: Env, fetchFn: FetchFn = fetch): Promise<ApiResponse> {
-  const g = await guard(req, env, fetchFn, 'POST')
+export async function handleRecipeSearch(req: ApiRequest, env: Env, fetchFn: FetchFn = fetch, getPage: PageFetcher = fetchPage): Promise<ApiResponse> {
+  const g = await guard(req, env, fetchFn, 'POST', 'recipes')
   if ('status' in g) return g
   const body = parseBody(req.body)
   if (!body) return errorBody(400, 'Ogiltig förfrågan.')
-  return findRecipes(body, env, fetchFn)
+  return findRecipes(body, env, fetchFn, getPage)
 }

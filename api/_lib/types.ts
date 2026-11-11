@@ -20,7 +20,8 @@ export interface Env {
   SUPABASE_URL?: string
   SUPABASE_ANON_KEY?: string
   SUPABASE_SERVICE_ROLE_KEY?: string
-  RATE_LIMIT_PER_MIN?: string
+  /** Kommaseparerade modeller som /api/ai får använda (annars en inbyggd lista). */
+  ALLOWED_MODELS?: string
   /** Anrop per besökare och dygn när åtkomsten är öppen (standard 100). */
   OPEN_DAILY_LIMIT?: string
   VAPID_PUBLIC_KEY?: string

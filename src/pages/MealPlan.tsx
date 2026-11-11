@@ -9,7 +9,7 @@ import { db } from '../db/db'
 import { addShoppingItems, dishId, getSettings, rateDish, saveSettings } from '../db/repo'
 import { WEEKDAYS_LONG, WEEKDAYS_SHORT, addDays, dayLabel, parseISODate, toHHmm, toISODate, weekdayOf } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
-import { recipeSearchUrl } from '../domain/recipeLink'
+import { httpsUrl, recipeSearchUrl } from '../domain/recipeLink'
 import { recipeForDish, splitIngredient } from '../ai/recipeSearch'
 import type { DishRating, PantryItem, PlannedDinner, PlannedSide } from '../domain/types'
 import { useAiConfig, useMealPlan, useNow, usePantry, useRatings, useSettings, useSides } from '../hooks'
@@ -312,7 +312,7 @@ export function MealPlanTab() {
               <AiProgress active={finding.has(d.id)} expected={20} label="Letar recept på nätet" />
               <div className="dinner-actions">
                 {d.url ? (
-                  <a className="btn primary" href={d.url} target="_blank" rel="noreferrer">Öppna receptet</a>
+                  <a className="btn primary" href={httpsUrl(d.url)} target="_blank" rel="noreferrer">Öppna receptet</a>
                 ) : (
                   <button type="button" className="btn primary" disabled={finding.has(d.id)} onClick={async () => findRecipe({ id: d.id, title: d.title, table: 'mealPlan' }, await authHeaders())}>{notFound.has(d.id) ? 'Försök igen' : 'Hitta recept'}</button>
                 )}
@@ -370,7 +370,7 @@ function PastDinners({ plan, today, ratings }: { plan: PlannedDinner[]; today: s
           <div key={d.id} className="past-row">
             <div className="past-body">
               <div className="sub">{dayLabel(d.date)}</div>
-              <div className="past-title">{d.url ? <a href={d.url} target="_blank" rel="noreferrer">{d.title}</a> : d.title}</div>
+              <div className="past-title">{d.url ? <a href={httpsUrl(d.url)} target="_blank" rel="noreferrer">{d.title}</a> : d.title}</div>
             </div>
             <RateButtons dish={d} ratings={ratings} />
           </div>
@@ -411,7 +411,7 @@ function SideRow({ side, dinners, pantry, expiring, finding, notFound, onFind }:
       <div className="side-body">
         <div className="side-title">{title}</div>
         {meta && <div className={`side-meta${lacking && !side.fromBatch && !needsRecipe ? ' warn' : ''}`}>{meta}</div>}
-        {side.url && <a className="side-link" href={side.url} target="_blank" rel="noreferrer">Öppna receptet</a>}
+        {side.url && <a className="side-link" href={httpsUrl(side.url)} target="_blank" rel="noreferrer">Öppna receptet</a>}
         {needsRecipe && !finding && <button type="button" className="side-link" onClick={onFind}>{notFound ? 'Försök igen' : 'Hitta recept'}</button>}
         {open && (
           <div className="dinner-ingredients">
