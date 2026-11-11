@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { deletePantryItem, newId, runOut, savePantryItem } from '../db/repo'
-import { PLACE_LABELS, guessPlace } from '../domain/storage'
+import { deletePantryItem, newId, savePantryItem } from '../db/repo'
 import { toISODate } from '../domain/dates'
-import type { PantryItem, StoragePlace } from '../domain/types'
+import type { PantryItem } from '../domain/types'
 import { undoable } from '../lib/undo'
 import { useFieldError } from '../hooks'
 
@@ -15,9 +14,6 @@ export function PantryForm({ item, onClose }: Props) {
   const [name, setName] = useState(item?.name ?? '')
   const [amount, setAmount] = useState(item?.amount ?? '')
   const [expires, setExpires] = useState(item?.expires ?? '')
-  /** Vald plats; null = följ gissningen från namnet. */
-  const [place, setPlace] = useState<StoragePlace | null>(item?.place ?? null)
-  const shownPlace = place ?? guessPlace(name)
   const { error, fail, touch } = useFieldError()
 
   async function submit(e: FormEvent) {
@@ -30,15 +26,8 @@ export function PantryForm({ item, onClose }: Props) {
       ...(expires ? { expires } : {}),
       addedAt: item?.addedAt ?? toISODate(new Date()),
       source: item?.source ?? 'manual',
-      ...(place ? { place } : {}),
       updatedAt: '',
     })
-    onClose()
-  }
-
-  async function usedUp() {
-    if (!item) return
-    await undoable(`${item.name} är slut och ligger på inköpslistan`, ['pantry', 'shopping'], () => runOut(item.id, true))
     onClose()
   }
 
@@ -61,12 +50,6 @@ export function PantryForm({ item, onClose }: Props) {
           <input type="text" placeholder="t.ex. 2 st, 500 g" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </label>
         <label className="field">
-          <span>Förvaras i</span>
-          <select value={shownPlace} onChange={(e) => setPlace(e.target.value as StoragePlace)}>
-            {(Object.keys(PLACE_LABELS) as StoragePlace[]).map((p) => <option key={p} value={p}>{PLACE_LABELS[p]}</option>)}
-          </select>
-        </label>
-        <label className="field">
           <span>Bäst före (valfritt)</span>
           <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
         </label>
@@ -75,7 +58,6 @@ export function PantryForm({ item, onClose }: Props) {
           <button type="submit" className="btn primary">Spara</button>
           <button type="button" className="btn" onClick={onClose}>Avbryt</button>
           <span className="spacer" />
-          {item && <button type="button" className="btn" onClick={usedUp}>Slut, handla mer</button>}
           {item && <button type="button" className="btn danger" onClick={remove}>Ta bort</button>}
         </div>
       </form>

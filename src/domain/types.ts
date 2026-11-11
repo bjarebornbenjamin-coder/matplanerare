@@ -43,9 +43,6 @@ export interface Settings {
   memories: string[]
 }
 
-/** Var en vara förvaras. */
-export type StoragePlace = 'fridge' | 'freezer' | 'pantry'
-
 export interface PantryItem {
   id: string
   name: string
@@ -54,8 +51,6 @@ export interface PantryItem {
   expires?: ISODate
   addedAt: ISODate
   source: 'manual' | 'receipt' | 'fridge' | 'shopping'
-  /** Var varan förvaras. Saknas = gissas från namnet. */
-  place?: StoragePlace
   updatedAt: string
 }
 

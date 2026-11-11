@@ -56,7 +56,6 @@ function parsePantry(v: unknown): PantryItem {
     ...(v.expires !== undefined ? { expires: v.expires as string } : {}),
     addedAt: v.addedAt as string,
     source: SOURCES.includes(v.source as string) ? (v.source as PantryItem['source']) : 'manual',
-    ...(v.place === 'fridge' || v.place === 'freezer' || v.place === 'pantry' ? { place: v.place } : {}),
     updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
   }
 }
