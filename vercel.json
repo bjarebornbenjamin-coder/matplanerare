@@ -1,4 +1,7 @@
 {
-  "rewrites": [{ "source": "/((?!assets/|.*\\..*).*)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/api/chat", "destination": "/api/ai" },
+    { "source": "/((?!api/|assets/|.*\\..*).*)", "destination": "/index.html" }
+  ],
   "functions": { "api/ai.ts": { "maxDuration": 60 }, "api/recipes.ts": { "maxDuration": 60 } }
 }
