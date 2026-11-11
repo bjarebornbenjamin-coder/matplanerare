@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { PantryForm } from '../components/PantryForm'
+import { Storage3D } from '../components/Storage3D'
 import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, runOut, saveShoppingItem } from '../db/repo'
 import { toISODate } from '../domain/dates'
 import { expiryLabel, expiryStatus, expiringWithin, sortPantry } from '../domain/food'
@@ -27,11 +28,28 @@ function RunOutDialog({ item, onClose }: { item: PantryItem; onClose: () => void
   )
 }
 
+const VIEW_KEY = 'pantry-view'
+
 export function PantryTab() {
   const pantry = usePantry()
   const today = toISODate(useNow())
   const [editing, setEditing] = useState<PantryItem | 'new' | null>(null)
   const [runningOut, setRunningOut] = useState<PantryItem | null>(null)
+  const [view, setView] = useState<'skap' | 'lista'>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'lista' ? 'lista' : 'skap'
+    } catch {
+      return 'skap'
+    }
+  })
+  const chooseView = (v: 'skap' | 'lista') => {
+    setView(v)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      /* valet gäller bara för stunden */
+    }
+  }
   if (!pantry) return null
 
   const sorted = sortPantry(pantry)
@@ -48,7 +66,17 @@ export function PantryTab() {
         <Link to="/skanna?typ=kvitto" className="btn">Skanna kvitto</Link>
         <Link to="/skanna?typ=kylskap" className="btn">Skanna kylskåp</Link>
       </div>
-      {sorted.map((i) => {
+      <div className="seg" role="group" aria-label="Visa lagret som">
+        <button type="button" className="tab" aria-pressed={view === 'skap'} onClick={() => chooseView('skap')}>Skåpen</button>
+        <button type="button" className="tab" aria-pressed={view === 'lista'} onClick={() => chooseView('lista')}>Lista</button>
+      </div>
+      {view === 'skap' && (
+        <>
+          <p className="storage-hint">Dra i en dörr för att öppna den, eller tryck på den. Tryck på en vara för att ändra den.</p>
+          <Storage3D pantry={pantry} today={today} onPick={setEditing} />
+        </>
+      )}
+      {view === 'lista' && sorted.map((i) => {
         const status = expiryStatus(i.expires, today)
         return (
           <div key={i.id} className="card task">
