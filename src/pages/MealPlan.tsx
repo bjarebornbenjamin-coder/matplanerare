@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AiProgress } from '../components/AiProgress'
 import { DoneButton } from '../components/DoneButton'
 import { Link } from 'react-router-dom'
@@ -8,6 +8,7 @@ import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
 import { addShoppingItems, dishId, getSettings, markEaten, rateDish, replaceOpenShopping, saveSettings } from '../db/repo'
 import { ConsumeDialog } from '../components/ConsumeDialog'
+import { CookingOverlay, type CookRow } from '../components/CookingOverlay'
 import { consumption, type Consumption } from '../domain/consume'
 import { planShopping } from '../ai/shoppingPlan'
 import { WEEKDAYS_LONG, WEEKDAYS_SHORT, addDays, dayLabel, parseISODate, toHHmm, toISODate, weekdayOf } from '../domain/dates'
@@ -43,6 +44,11 @@ export function MealPlanTab() {
   const [message, setMessage] = useState('')
   const [shopping, setShopping] = useState(false)
   const [eating, setEating] = useState<{ target: EatTarget; used: Consumption[] } | null>(null)
+  /** "Köket": helskärmsvyn medan menyn görs. null när den inte visas (eller har dolts). */
+  const [cook, setCook] = useState<{ stage: 'plan' | 'recipes' | 'done'; dates: string[]; leaving: boolean } | null>(null)
+  const cookShown = useRef(false)
+  /** Sant en kort stund efter att menyn är klar, så att korten serveras in i tur och ordning. */
+  const [served, setServed] = useState(false)
   /** Förlopp när menyn görs: uppskattning medan AI:n planerar, sedan verkligt per hämtat recept. */
   const [progress, setProgress] = useState<{ label: string; value?: number }>({ label: 'Planerar rätterna' })
   const [openIng, setOpenIng] = useState<Set<string>>(new Set())
@@ -125,13 +131,16 @@ export function MealPlanTab() {
     setError('')
     setMessage('')
     setProgress({ label: 'Planerar rätterna' })
-    requestAnimationFrame(() => document.getElementById('plan-progress')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+    const from = planStart(today, toHHmm(now))
+    const dates = Array.from({ length: days }, (_, i) => addDays(from, i))
+    // Köket öppnas direkt, så att det syns att något händer.
+    cookShown.current = true
+    setCook({ stage: 'plan', dates, leaving: false })
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
     try {
       const stored = await getSettings()
       // Önskemål som skrivits men inte sparats än (rutan sparar när den lämnas).
       const s = { ...stored, food: { ...stored.food, weekWishes: (wishes ?? stored.food.weekWishes ?? '').trim() } }
-      const from = planStart(today, toHHmm(now))
-      const dates = Array.from({ length: days }, (_, i) => addDays(from, i))
       const recent = plan!.filter((d) => d.date < from && d.date >= addDays(from, -21)).map((d) => d.title)
       // En ny meny ersätter hela den kommande menyn, inte bara de valda dagarna: väljer man
       // 3 dagar ska det inte ligga kvar rätter från en äldre 7-dagarsmeny efteråt.
@@ -155,6 +164,7 @@ export function MealPlanTab() {
         await db.mealPlan.bulkPut(dinners.map((d) => ({ ...d, updatedAt: stamp })))
         await db.sides.bulkPut(newSides.map((x) => ({ ...x, updatedAt: stamp })))
       })
+      setCook((c) => c && { ...c, stage: 'recipes' })
       if (dinners.length < dates.length) setMessage(`AI:n gav bara ${dinners.length} av ${dates.length} dagar. Gör om för att fylla resten.`)
       // Riktiga recept till alla måltider (utom matlådor), fyra åt gången så att servern inte överbelastas.
       const headers = await authHeaders()
@@ -174,9 +184,23 @@ export function MealPlanTab() {
           setProgress({ label: `Hämtar recept ${done} av ${total}`, value: 30 + (70 * done) / total })
         }
       }))
+      // Visa "klart" en stund, tona ut köket och servera korten.
+      if (cookShown.current) {
+        setCook((c) => c && { ...c, stage: 'done' })
+        await wait(1500)
+        setCook((c) => c && { ...c, leaving: true })
+        await wait(360)
+      }
+      cookShown.current = false
+      setCook(null)
+      setServed(true)
+      setTimeout(() => setServed(false), 2600)
       requestAnimationFrame(() => document.getElementById('veckans-mat')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     } catch (e) {
+      cookShown.current = false
+      setCook(null)
       setError(e instanceof Error ? e.message : 'Något gick fel.')
+      requestAnimationFrame(() => document.getElementById('plan-progress')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
     } finally {
       setBusy(false)
     }
@@ -204,6 +228,24 @@ export function MealPlanTab() {
       setShopping(false)
     }
   }
+
+  // Raderna i köket: tomma medan AI:n väljer, sedan rätterna direkt ur menyn så att de
+  // uppdateras när recepten hämtas.
+  const cookRows: CookRow[] = (cook?.dates ?? []).map((date) => {
+    const chosen = cook!.stage !== 'plan'
+    const d = chosen ? plan.find((x) => x.date === date) : undefined
+    const extras = chosen
+      ? sides.filter((x) => x.date === date).sort((a, b) => (a.slot === b.slot ? 0 : a.slot === 'breakfast' ? -1 : 1)).map((x) => `${SLOT_LABEL[x.slot]}: ${x.fromBatch ? 'matlåda' : x.title}`).join(' · ')
+      : ''
+    return {
+      date,
+      label: date === today ? 'Idag' : WEEKDAYS_SHORT[weekdayOf(date) - 1],
+      day: parseISODate(date).getDate(),
+      dinner: chosen ? (d?.title ?? 'Ingen rätt den här gången') : undefined,
+      ready: Boolean(d?.url),
+      ...(extras ? { extras } : {}),
+    }
+  })
 
   return (
     <>
@@ -296,9 +338,23 @@ export function MealPlanTab() {
       <AiProgress active={shopping} expected={15} label="Räknar ihop veckans inköp" />
       {message && <p className="muted" role="status">{message}</p>}
 
+      {cook && (
+        <CookingOverlay
+          stage={cook.stage}
+          rows={cookRows}
+          progress={progress}
+          leaving={cook.leaving}
+          onHide={() => {
+            cookShown.current = false
+            setCook(null)
+            requestAnimationFrame(() => document.getElementById('plan-progress')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+          }}
+        />
+      )}
       {dates.length > 0 && <h2 id="veckans-mat">Veckans mat</h2>}
       {dates.length === 0 && !busy && <p className="empty">Ingen meny än. Tryck Gör veckomeny.</p>}
-      {dates.map((date) => {
+      {dates.map((date, cardIndex) => {
+        const serve = { className: served ? ' served' : '', style: { '--i': cardIndex } as CSSProperties }
         const d = upcoming.find((x) => x.date === date)
         const daySides = upcomingSides.filter((x) => x.date === date).sort((a, b) => (a.slot === b.slot ? 0 : a.slot === 'breakfast' ? -1 : 1))
         const sideRows = daySides.length > 0 && (
@@ -310,7 +366,7 @@ export function MealPlanTab() {
         )
         if (!d) {
           return (
-            <section key={date} id={`middag-${date}`} className={`dinner${date === today ? ' is-today' : ''}`} aria-label={dayLabel(date)}>
+            <section key={date} id={`middag-${date}`} className={`dinner${date === today ? ' is-today' : ''}${serve.className}`} style={serve.style} aria-label={dayLabel(date)}>
               <div className="dinner-head">
                 <DateBadge date={date} today={today} />
                 <div className="dinner-headline"><h3 className="dinner-title muted-title">Ingen middag planerad</h3></div>
@@ -324,7 +380,7 @@ export function MealPlanTab() {
         const lacking = ingredients.filter((i) => i.status === 'missing').length
         const open = openIng.has(d.id)
         return (
-          <section key={d.id} id={`middag-${d.date}`} className={`dinner${d.date === today ? ' is-today' : ''}`} aria-label={`${dayLabel(d.date)}: ${d.title}`}>
+          <section key={d.id} id={`middag-${d.date}`} className={`dinner${d.date === today ? ' is-today' : ''}${serve.className}`} style={serve.style} aria-label={`${dayLabel(d.date)}: ${d.title}`}>
             <div className="dinner-head">
               <DateBadge date={d.date} today={today} />
               <div className="dinner-headline">

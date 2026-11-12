@@ -681,3 +681,84 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 .consume-row input { width: 22px; height: 22px; margin-top: 2px; flex: none; accent-color: var(--primary); }
 .consume-row .title { display: block; font-weight: 500; }
 .consume-row .sub { display: block; }
+
+/* ===== Köket: helskärmsvyn medan menyn görs ===== */
+.cook {
+  position: fixed; inset: 0; z-index: 60; overflow-y: auto; color: #fff;
+  background: linear-gradient(160deg, #08318f 0%, #0b57d0 48%, #4a2dbd 100%);
+  display: flex; justify-content: center; padding: max(28px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+}
+.cook-glow { position: absolute; inset: -20%; pointer-events: none; background: radial-gradient(40% 30% at 30% 20%, rgba(120, 180, 255, 0.45), transparent 70%), radial-gradient(35% 30% at 75% 75%, rgba(170, 120, 255, 0.4), transparent 70%); }
+.cook-inner { position: relative; width: 100%; max-width: 440px; margin: auto 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.cook-pot { width: 168px; height: 160px; overflow: visible; filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.28)); }
+.cook-lid { transform-origin: 100px 85px; }
+.cook-flames path { transform-origin: 50% 100%; transform-box: fill-box; }
+.cook-title { margin: 14px 0 2px; font-size: 26px; font-weight: 600; color: #fff; letter-spacing: -0.2px; }
+.cook-status { margin: 0 0 14px; min-height: 22px; font-size: 15px; color: rgba(255, 255, 255, 0.85); font-variant-numeric: tabular-nums; }
+.cook .ai-progress { width: 100%; margin: 0 0 18px; }
+.cook .ai-progress-head { color: rgba(255, 255, 255, 0.85); }
+.cook .ai-progress-head span:first-child { visibility: hidden; }
+.cook .ai-progress-track { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.22); }
+.cook .ai-progress-fill { background: #fff; border-radius: 4px; }
+
+.cook-days { list-style: none; width: 100%; margin: 0; padding: 6px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; border-radius: 22px; background: rgba(255, 255, 255, 0.12); text-align: left; }
+.cook-days li { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 8px 12px 8px 8px; border-radius: 16px; background: rgba(255, 255, 255, 0.1); }
+.cook-date { flex: 0 0 46px; height: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; background: rgba(255, 255, 255, 0.16); }
+.cook-date span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.85; }
+.cook-date strong { font-size: 16px; line-height: 1.1; font-weight: 600; }
+.cook-dish { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cook-dish-title { font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.cook-dish-extras { font-size: 12.5px; color: rgba(255, 255, 255, 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cook-skeleton { flex: 1; height: 14px; max-width: 70%; border-radius: 7px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.16) 25%, rgba(255, 255, 255, 0.42) 50%, rgba(255, 255, 255, 0.16) 75%); background-size: 220% 100%; }
+.cook-days li:nth-child(even) .cook-skeleton { max-width: 52%; }
+.cook-check { flex: none; width: 24px; height: 24px; }
+.cook-hide { margin-top: 18px; padding: 10px 14px; min-height: 44px; border: 0; background: none; color: rgba(255, 255, 255, 0.85); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.cook-hide:hover { color: #fff; }
+.cook-hide:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 8px; }
+
+.cook-done { position: relative; width: 168px; height: 160px; display: grid; place-items: center; }
+.cook-done svg { width: 124px; height: 124px; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.28)); }
+.cook-done i { position: absolute; top: 50%; left: 50%; width: 9px; height: 9px; margin: -4.5px; border-radius: 50%; background: #fff; opacity: 0; }
+.cook-done i:nth-child(3n) { background: #ffd66b; }
+.cook-done i:nth-child(3n + 1) { background: #a8c7fa; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .cook { animation: cook-in 320ms ease-out both; }
+  .cook.leaving { animation: cook-out 380ms ease-in both; }
+  .cook-glow { animation: cook-drift 14s ease-in-out infinite alternate; }
+  .cook-inner { animation: cook-rise 420ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+  .cook-lid { animation: cook-lid 0.9s ease-in-out infinite; }
+  .cook-steam path { animation: cook-steam 2.4s ease-in-out infinite; opacity: 0; }
+  .cook-steam path:nth-child(2) { animation-delay: 0.8s; }
+  .cook-steam path:nth-child(3) { animation-delay: 1.6s; }
+  .cook-bubbles circle { animation: cook-bubble 1.5s ease-in infinite; opacity: 0; }
+  .cook-bubbles circle:nth-child(2) { animation-delay: 0.5s; }
+  .cook-bubbles circle:nth-child(3) { animation-delay: 1s; }
+  .cook-flames path { animation: cook-flame 0.5s ease-in-out infinite alternate; }
+  .cook-flames path:nth-child(2) { animation-duration: 0.38s; }
+  .cook-flames path:nth-child(3) { animation-duration: 0.62s; }
+  .cook-status { animation: cook-fade 360ms ease-out both; }
+  .cook-skeleton { animation: cook-shimmer 1.4s linear infinite; }
+  .cook-days li { animation: cook-row 420ms cubic-bezier(0.2, 0.9, 0.3, 1) both; animation-delay: calc(120ms + var(--i, 0) * 60ms); }
+  .cook-dish { animation: cook-dish 480ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; animation-delay: calc(var(--i, 0) * 110ms); }
+  .cook-check { animation: cook-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+  .cook-done svg { animation: cook-pop 560ms cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+  .cook-done i { animation: cook-spark 900ms cubic-bezier(0.1, 0.8, 0.3, 1) 120ms both; }
+  /* Menykorten serveras i tur och ordning när vyn stängs. */
+  .dinner.served { animation: card-serve 560ms cubic-bezier(0.2, 0.9, 0.3, 1) both; animation-delay: calc(var(--i, 0) * 90ms); }
+}
+@keyframes cook-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cook-out { to { opacity: 0; transform: translateY(-4%); } }
+@keyframes cook-rise { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes cook-drift { from { transform: translate(-3%, -2%) rotate(0deg); } to { transform: translate(3%, 3%) rotate(8deg); } }
+@keyframes cook-lid { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-4px) rotate(-2.5deg); } 50% { transform: translateY(0) rotate(0); } 75% { transform: translateY(-3px) rotate(2.5deg); } }
+@keyframes cook-steam { 0% { opacity: 0; transform: translateY(10px); } 35% { opacity: 0.85; } 100% { opacity: 0; transform: translateY(-16px); } }
+@keyframes cook-bubble { 0% { opacity: 0; transform: translateY(6px) scale(0.6); } 40% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-14px) scale(1.2); } }
+@keyframes cook-flame { from { transform: scaleY(0.75) scaleX(1.05); } to { transform: scaleY(1.15) scaleX(0.92); } }
+@keyframes cook-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes cook-shimmer { from { background-position: 120% 0; } to { background-position: -100% 0; } }
+@keyframes cook-row { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes cook-dish { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes cook-pop { 0% { opacity: 0; transform: scale(0.2); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes cook-spark { 0% { opacity: 1; transform: rotate(var(--a)) translateY(-40px) scale(1); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-104px) scale(0.3); } }
+@keyframes card-serve { from { opacity: 0; transform: translateY(26px) scale(0.97); } to { opacity: 1; transform: none; } }
