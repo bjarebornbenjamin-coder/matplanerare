@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as R
 import { useNavigate } from 'react-router-dom'
 import { moveBoughtToPantry, saveShoppingItem } from '../db/repo'
 import { tidyAmount } from '../domain/shoppingName'
-import { SECTIONS, sectionOf } from '../domain/storeSection'
+import { AiProgress } from '../components/AiProgress'
+import { SECTIONS, sectionFor } from '../domain/storeSection'
+import { useShoppingTidy } from '../lib/shoppingTidy'
 import type { ShoppingItem } from '../domain/types'
 import { useShopping } from '../hooks'
 
@@ -91,6 +93,8 @@ export function ShopModePage() {
   const [leaving, setLeaving] = useState<Set<string>>(new Set())
   const [basketOpen, setBasketOpen] = useState(false)
   const [stored, setStored] = useState<number | null>(null)
+  // Medan AI:n går igenom listan visas inga rader, så att inget bockas av på en lista som strax byts ut.
+  const tidy = useShoppingTidy()
 
   // Håll skärmen tänd i butiken (där webbläsaren stöder det), och släpp låset när läget stängs.
   useEffect(() => {
@@ -131,7 +135,7 @@ export function ShopModePage() {
   const got = total - left
   const groups = SECTIONS.map((section) => ({
     section,
-    items: open.filter((i) => sectionOf(i.name) === section).sort((a, b) => a.name.localeCompare(b.name, 'sv')),
+    items: open.filter((i) => sectionFor(i) === section).sort((a, b) => a.name.localeCompare(b.name, 'sv')),
   })).filter((g) => g.items.length > 0)
 
   function check(item: ShoppingItem) {
@@ -203,7 +207,14 @@ export function ShopModePage() {
         </div>
       )}
 
-      {!allDone && groups.map((g, gi) => (
+      {tidy.running && (
+        <div className="shop-tidying">
+          <p>AI:n går igenom listan: slår ihop samma varor och sorterar efter avdelning.</p>
+          <AiProgress active expected={12} label="Snyggar till listan" />
+        </div>
+      )}
+
+      {!allDone && !tidy.running && groups.map((g, gi) => (
         <section key={g.section} className="shop-section" style={{ '--i': gi } as CSSProperties} aria-label={g.section}>
           <h2>
             <span>{g.section}</span>
@@ -215,7 +226,7 @@ export function ShopModePage() {
         </section>
       ))}
 
-      {!allDone && basket.length > 0 && (
+      {!allDone && !tidy.running && basket.length > 0 && (
         <section className={`shop-basket${basketOpen ? ' is-open' : ''}`} aria-label="I korgen">
           <button type="button" className="shop-basket-head" aria-expanded={basketOpen} onClick={() => setBasketOpen(!basketOpen)}>
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 9h14l-1.4 9.2a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8zM9 9l3-5 3 5" /></svg>

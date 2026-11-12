@@ -39,6 +39,12 @@ function hit(key: string, word: string): boolean {
   return key.split(/[\s,-]+/).some((part) => (word.length <= 2 ? part === word : part.startsWith(word) || part.endsWith(word)))
 }
 
+/** Är texten en av avdelningarna? */
+export const isSection = (s: unknown): s is Section => typeof s === 'string' && (SECTIONS as readonly string[]).includes(s)
+
+/** Varans avdelning: den AI:n satt om den finns, annars en gissning från namnet. */
+export const sectionFor = (item: { name: string; section?: string }): Section => (isSection(item.section) ? item.section : sectionOf(item.name))
+
 /** Vilken avdelning varan brukar stå i. Okänt (t.ex. tandkräm) hamnar under Övrigt. */
 export function sectionOf(name: string): Section {
   const key = foodKey(name)

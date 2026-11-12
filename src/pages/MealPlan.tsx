@@ -11,6 +11,7 @@ import { ConsumeDialog } from '../components/ConsumeDialog'
 import { CookingOverlay, type CookRow } from '../components/CookingOverlay'
 import { consumption, type Consumption } from '../domain/consume'
 import { planShopping } from '../ai/shoppingPlan'
+import { rememberTidied } from '../lib/shoppingTidy'
 import { WEEKDAYS_LONG, WEEKDAYS_SHORT, addDays, dayLabel, parseISODate, toHHmm, toISODate, weekdayOf } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
 import { httpsUrl, recipeSearchUrl } from '../domain/recipeLink'
@@ -219,6 +220,7 @@ export function MealPlanTab() {
       try {
         const lines = await planShopping({ needs, pantry: pantry!, current }, config?.model ?? 'gpt-4o-mini', await authHeaders())
         await undoable('Inköpslistan är uppdaterad', ['shopping'], () => replaceOpenShopping(lines))
+        rememberTidied(lines) // AI:n har redan gått igenom de här raderna
         setMessage(`Inköpslistan har ${lines.length} varor, sammanräknade för hela veckan.`)
       } catch {
         const { added, skipped } = await addShoppingItems(missing)

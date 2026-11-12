@@ -53,6 +53,8 @@ export interface ShoppingItem {
   done: boolean
   /** Varifrån varan kom, t.ex. receptets namn. */
   note?: string
+  /** Avdelning i butiken, satt av AI:n. Saknas den gissas den från namnet. */
+  section?: string
   addedAt: ISODate
   updatedAt: string
 }

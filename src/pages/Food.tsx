@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AiProgress } from '../components/AiProgress'
-import { planShopping } from '../ai/shoppingPlan'
-import { authHeaders } from '../lib/auth'
 import { PantryForm } from '../components/PantryForm'
-import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, replaceOpenShopping, runOut, saveShoppingItem } from '../db/repo'
+import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, runOut, saveShoppingItem } from '../db/repo'
 import { toISODate } from '../domain/dates'
 import { tidyAmount } from '../domain/shoppingName'
-import { mergeShopping } from '../domain/shoppingMerge'
+import { SECTIONS, sectionFor } from '../domain/storeSection'
+import { tidyShopping, useShoppingTidy } from '../lib/shoppingTidy'
 import { expiryLabel, expiryStatus, expiringWithin, sortPantry } from '../domain/food'
 import type { PantryItem } from '../domain/types'
-import { useAiConfig, useFieldError, useNow, usePantry, useShopping } from '../hooks'
+import { useFieldError, useNow, usePantry, useShopping } from '../hooks'
 import { undoable } from '../lib/undo'
 
 function RunOutDialog({ item, onClose }: { item: PantryItem; onClose: () => void }) {
@@ -76,25 +75,23 @@ export function ShoppingTab() {
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [message, setMessage] = useState('')
-  const [tidying, setTidying] = useState(false)
-  const pantry = usePantry()
-  const config = useAiConfig()
+  const tidy = useShoppingTidy()
   const { error, fail, touch } = useFieldError()
 
-  // Samma vara på flera rader ("gul lök", "hackad gul lök", "Lök") slås ihop när listan öppnas.
-  // Det görs en gång per besök, så att Ångra inte genast görs om.
-  const merged = useRef(false)
+  // AI:n går igenom listan när den öppnas, om det tillkommit varor sedan sist. En gång per
+  // besök, så att Ångra inte genast görs om.
+  const started = useRef(false)
   useEffect(() => {
-    if (!shopping || merged.current) return
-    merged.current = true
-    const r = mergeShopping(shopping.filter((i) => !i.done))
-    if (!r.changed) return
-    void undoable(r.merged > 0 ? `${r.merged} ${r.merged === 1 ? 'dubblett' : 'dubbletter'} på inköpslistan slogs ihop` : 'Inköpslistan städades', ['shopping'], () => replaceOpenShopping(r.lines))
+    if (!shopping || started.current) return
+    started.current = true
+    void tidyShopping()
   }, [shopping])
 
   if (!shopping) return null
 
-  const open = shopping.filter((i) => !i.done).sort((a, b) => a.addedAt.localeCompare(b.addedAt) || a.name.localeCompare(b.name, 'sv'))
+  const open = shopping.filter((i) => !i.done)
+  // Samma ordning som i butiken: avdelning för avdelning, och i bokstavsordning inom varje.
+  const groups = SECTIONS.map((section) => ({ section, items: open.filter((i) => sectionFor(i) === section).sort((a, b) => a.name.localeCompare(b.name, 'sv')) })).filter((g) => g.items.length > 0)
   const bought = shopping.filter((i) => i.done)
 
   async function add(e: FormEvent) {
@@ -105,23 +102,6 @@ export function ShoppingTab() {
     setName('')
     setAmount('')
     setMessage('')
-  }
-
-  /** Slår ihop dubbletter, rensar namnen och räknar om mängderna med AI. */
-  async function tidy() {
-    setTidying(true)
-    setMessage('')
-    try {
-      const current = shopping!.filter((i) => !i.done)
-      const lines = await planShopping({ needs: [], pantry: pantry ?? [], current }, config?.model ?? 'gpt-4o-mini', await authHeaders())
-      await undoable('Inköpslistan är städad', ['shopping'], () => replaceOpenShopping(lines))
-      const merged = current.length - lines.length
-      setMessage(merged > 0 ? `${merged} ${merged === 1 ? 'dubblett' : 'dubbletter'} slogs ihop.` : 'Listan är städad.')
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Kunde inte städa listan.')
-    } finally {
-      setTidying(false)
-    }
   }
 
   async function toPantry() {
@@ -163,10 +143,16 @@ export function ShoppingTab() {
       )}
       <div className="list-head">
         <p className="muted">{open.length === 0 ? 'Inköpslistan är tom.' : `${open.length} att köpa`}</p>
-        {open.length > 1 && <button type="button" className="btn" disabled={tidying} onClick={tidy}>{tidying ? 'Städar…' : 'Städa med AI'}</button>}
+        {open.length > 1 && <button type="button" className="btn" disabled={tidy.running} onClick={() => tidyShopping({ force: true })}>{tidy.running ? 'Städar…' : 'Städa med AI'}</button>}
       </div>
-      <AiProgress active={tidying} expected={12} label="Slår ihop och rensar listan" />
-      {open.map(row)}
+      <AiProgress active={tidy.running} expected={12} label="AI:n går igenom listan" />
+      {tidy.message && !tidy.running && <p className="muted" role="status">{tidy.message}</p>}
+      {groups.map((g) => (
+        <section key={g.section} aria-label={g.section}>
+          <h2 className="list-section">{g.section}</h2>
+          {g.items.map(row)}
+        </section>
+      ))}
 
       {bought.length > 0 && (
         <>

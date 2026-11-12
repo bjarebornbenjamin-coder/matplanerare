@@ -1,4 +1,5 @@
 import { DEFAULT_FOOD } from './repo'
+import { isSection } from '../domain/storeSection'
 import type { Backup, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem } from '../domain/types'
 
 const fail = (msg: string): never => {
@@ -62,6 +63,7 @@ function parseShopping(v: unknown): ShoppingItem {
     ...(isStr(v.amount) && v.amount ? { amount: v.amount } : {}),
     done: v.done === true,
     ...(isStr(v.note) && v.note ? { note: v.note } : {}),
+    ...(isSection(v.section) ? { section: v.section } : {}),
     addedAt: isDate(v.addedAt) ? (v.addedAt as string) : new Date().toISOString().slice(0, 10),
     updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
   }

@@ -30,7 +30,7 @@ describe('ihopslagning av inköpslistan', () => {
   it('olika varor hålls isär', () => {
     for (const [a, b] of [['Lök', 'Rödlök'], ['Lök', 'Vitlök'], ['Vispgrädde', 'Matlagningsgrädde'], ['Gul paprika', 'Röd paprika'], ['Tomater', 'Krossade tomater'], ['Mjölk', 'Kokosmjölk']])
       expect([a, b, sameShoppingItem(a, b)]).toEqual([a, b, false])
-    for (const [a, b] of [['gul lök', 'Lök'], ['hackad gul lök', 'lök'], ['Tomater', 'tomat'], ['Morötter', 'morot'], ['riven ost', 'Ost']])
+    for (const [a, b] of [['gul lök', 'Lök'], ['hackad gul lök', 'lök'], ['Tomater', 'tomat'], ['Morötter', 'morot'], ['riven ost', 'Ost'], ['Röda lökar', 'Rödlök'], ['röd lök', 'Rödlök'], ['vitlöksklyftor', 'Vitlök']])
       expect([a, b, sameShoppingItem(a, b)]).toEqual([a, b, true])
   })
   it('lägger ihop mängder i samma enhet', () => {
@@ -39,5 +39,9 @@ describe('ihopslagning av inköpslistan', () => {
     expect(addAmounts(['1', '2 st', undefined])).toBe('3 st')
     expect(addAmounts(['1 burk', '1 burk', '400 g'])).toBe('400 g + 1 burk')
     expect(addAmounts(['1 bit', ''])).toBeUndefined()
+  })
+  it('avdelningen från AI:n följer med vid ihopslagning', () => {
+    const r = mergeShopping([{ name: 'Röda lökar', amount: '4 st', note: 'Chili sin carne', section: 'Frukt & grönt' }, { name: 'Rödlök', amount: '0,5 st', note: 'Tzatziki' }])
+    expect(r.lines).toEqual([{ name: 'Rödlök', amount: '4,5 st', note: 'Chili sin carne, Tzatziki', section: 'Frukt & grönt' }])
   })
 })

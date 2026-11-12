@@ -61,8 +61,25 @@ const SAME: Record<string, string> = {
 /** Oregelbundna böjningar som inte fångas av ändelserna. */
 const FORMS: Record<string, string> = { morötter: 'morot', lökar: 'lök', ägg: 'ägg', tomater: 'tomat' }
 
+/** Varor som skrivs isär eller ihop: "röda lökar" och "röd lök" är rödlök. */
+const PHRASES: [RegExp, string][] = [
+  [/^röda? lök(ar)?$/, 'rödlök'],
+  [/^rödlökar$/, 'rödlök'],
+  [/^vitlöksklyft(a|or)$/, 'vitlök'],
+  [/^klyft(a|or) vitlök$/, 'vitlök'],
+  [/^salladslökar$/, 'salladslök'],
+]
+const phrase = (key: string) => PHRASES.find(([re]) => re.test(key))?.[1] ?? key
+
+/** Namnet som det ska stå på listan: "röda lökar" → "Rödlök", "hackad gul lök" → "Gul lök". */
+export function listName(name: string): string {
+  const clean = cleanName(name)
+  const canon = phrase(foodKey(clean))
+  return canon === foodKey(clean) ? clean : canon[0].toLocaleUpperCase('sv') + canon.slice(1)
+}
+
 const words = (s: string, variants = true) =>
-  foodKey(cleanName(s))
+  phrase(foodKey(cleanName(s)))
     .split(/[\s-]+/)
     .filter((w) => w && !NEUTRAL.has(w))
     .map((w) => FORMS[w] ?? (variants ? (SAME[w] ?? w) : w))

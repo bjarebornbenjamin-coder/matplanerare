@@ -32,4 +32,21 @@ describe('inköpslista med AI', () => {
     expect(() => parseShopping('{"x":1}', [])).toThrow(/ingen inköpslista/)
     expect(JSON.parse(shoppingUserContent({ needs: [], pantry: [], current: [] }))).toEqual({ needs: [], pantry: [], current: [] })
   })
+  it('tar med avdelningen från AI:n, men bara om den är en av butikens', () => {
+    const text = JSON.stringify({ items: [{ name: 'Rödlök', amount: '5 st', note: 'Chili sin carne', section: 'Frukt & grönt' }, { name: 'Gurka', section: 'Hittepå' }] })
+    expect(parseShopping(text, [])).toEqual([{ name: 'Rödlök', amount: '5 st', note: 'Chili sin carne', section: 'Frukt & grönt' }, { name: 'Gurka' }])
+    expect(SHOPPING_PROMPT).toMatch(/"Röda lökar" och "Rödlök"/)
+    expect(SHOPPING_PROMPT).toMatch(/sats/)
+    expect(SHOPPING_PROMPT).toMatch(/section/)
+  })
+  it('räknar inte en vara dubbelt när AI:n slagit ihop den under ett annat namn', () => {
+    const before = [{ name: 'Röda lökar', amount: '4 st', note: 'Chili sin carne' }, { name: 'Rödlök', amount: '0,5 st', note: 'Tzatziki' }, { name: 'Sats gurka med chili', note: 'Tzatziki' }, { name: 'Tandkräm' }]
+    const text = JSON.stringify({ items: [{ name: 'Rödlök', amount: '5 st', note: 'Chili sin carne, Tzatziki' }, { name: 'Gurka', note: 'Tzatziki' }, { name: 'Chili', note: 'Tzatziki' }] })
+    expect(parseShopping(text, before)).toEqual([
+      { name: 'Rödlök', amount: '5 st', note: 'Chili sin carne, Tzatziki' },
+      { name: 'Gurka', note: 'Tzatziki' },
+      { name: 'Chili', note: 'Tzatziki' },
+      { name: 'Tandkräm' }, // egen vara som AI:n tappade: läggs tillbaka
+    ])
+  })
 })

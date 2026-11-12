@@ -2,6 +2,7 @@ import { DEFAULT_MODEL } from '../ai/models'
 import { toISODate } from '../domain/dates'
 import { foodKey } from '../domain/food'
 import { sameShoppingItem } from '../domain/consume'
+import { isSection } from '../domain/storeSection'
 import type { AiConfig, Backup, FoodSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
 import { db } from './db'
 
@@ -88,6 +89,8 @@ export interface ShoppingDraft {
   name: string
   amount?: string
   note?: string
+  /** Avdelning i butiken (från AI:n). */
+  section?: string
 }
 
 export async function addShoppingItems(drafts: ShoppingDraft[], today = toISODate(new Date())): Promise<{ added: number; skipped: number }> {
@@ -137,6 +140,7 @@ export async function replaceOpenShopping(lines: ShoppingDraft[], today = toISOD
         name,
         ...(l.amount?.trim() ? { amount: l.amount.trim() } : {}),
         ...(l.note?.trim() ? { note: l.note.trim() } : {}),
+        ...(isSection(l.section) ? { section: l.section } : {}),
         done: false,
         addedAt: old?.addedAt ?? today,
         updatedAt: stamp,

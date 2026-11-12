@@ -837,3 +837,7 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 @media (prefers-reduced-motion: reduce) { .shop-item, .shop-ring-fill, .shop-name, .shop-check, .shop-check path { transition: none; } }
 @keyframes shop-in { from { opacity: 0; transform: translateY(5%); } to { opacity: 1; transform: none; } }
 @keyframes shop-leave { from { opacity: 1; max-height: 120px; transform: none; } to { opacity: 0; max-height: 0; margin-top: -8px; transform: translateX(48px); } }
+
+h2.list-section { margin: 14px 4px 6px; }
+.shop-tidying { padding: 8vh 4px 0; text-align: center; color: var(--muted); }
+.shop-tidying .ai-progress { max-width: 360px; margin: 16px auto 0; }

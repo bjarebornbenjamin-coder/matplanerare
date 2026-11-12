@@ -1,11 +1,12 @@
-import { formatQty, qty, sameShoppingItem } from './consume'
-import { cleanName, tidyAmount } from './shoppingName'
+import { formatQty, listName, qty, sameShoppingItem } from './consume'
+import { tidyAmount } from './shoppingName'
 
 /** En rad på inköpslistan, före eller efter ihopslagning. */
 export interface MergeLine {
   name: string
   amount?: string
   note?: string
+  section?: string
 }
 
 /** Rätterna ur en anteckning: "Veckomeny: Pyttipanna, Laxsoppa" → ["Pyttipanna", "Laxsoppa"]. */
@@ -49,12 +50,13 @@ export function mergeShopping<T extends MergeLine>(items: T[]): { lines: MergeLi
   let changed = false
   const lines = groups.map((g) => {
     const fromRecipe = g.some((i) => dishes(i.note).length > 0)
-    if (g.length === 1 && !fromRecipe) return { name: g[0].name, ...(g[0].amount ? { amount: g[0].amount } : {}), ...(g[0].note ? { note: g[0].note } : {}) }
+    const section = g.find((i) => i.section)?.section
+    if (g.length === 1 && !fromRecipe) return { name: g[0].name, ...(g[0].amount ? { amount: g[0].amount } : {}), ...(g[0].note ? { note: g[0].note } : {}), ...(section ? { section } : {}) }
     // Det mest beskrivande namnet: "Gul lök" hellre än "Lök".
-    const name = g.map((i) => cleanName(i.name)).sort((a, b) => b.split(' ').length - a.split(' ').length || b.length - a.length)[0]
+    const name = g.map((i) => listName(i.name)).sort((a, b) => b.split(' ').length - a.split(' ').length || b.length - a.length)[0]
     const amount = addAmounts(g.map((i) => i.amount))
     const note = [...new Set(g.flatMap((i) => dishes(i.note)))].join(', ').slice(0, 120)
-    const line = { name, ...(amount ? { amount } : {}), ...(note ? { note } : {}) }
+    const line = { name, ...(amount ? { amount } : {}), ...(note ? { note } : {}), ...(section ? { section } : {}) }
     if (g.length > 1 || line.name !== g[0].name || (line.amount ?? '') !== (g[0].amount ?? '') || (line.note ?? '') !== (g[0].note ?? '')) changed = true
     return line
   })
