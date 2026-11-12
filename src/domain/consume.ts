@@ -58,11 +58,14 @@ const SAME: Record<string, string> = {
   laxfilé: 'lax', torskfilé: 'torsk', morötter: 'morot',
 }
 
-const words = (s: string) =>
+/** Oregelbundna böjningar som inte fångas av ändelserna. */
+const FORMS: Record<string, string> = { morötter: 'morot', lökar: 'lök', ägg: 'ägg', tomater: 'tomat' }
+
+const words = (s: string, variants = true) =>
   foodKey(cleanName(s))
     .split(/[\s-]+/)
     .filter((w) => w && !NEUTRAL.has(w))
-    .map((w) => SAME[w] ?? w)
+    .map((w) => FORMS[w] ?? (variants ? (SAME[w] ?? w) : w))
     .sort()
 
 const ENDINGS = ['er', 'ar', 'or', 'n', 'en', 'et', 'na', 'r', 'erna', 'arna', 'orna']
@@ -84,6 +87,16 @@ export function sameProduct(ingredient: string, pantryName: string): boolean {
   const a = words(ingredient)
   const b = words(pantryName)
   return a.length > 0 && a.length === b.length && a.every((w, i) => sameWord(w, b[i]))
+}
+
+/**
+ * Samma vara på inköpslistan: "hackad gul lök", "gul lök" och "Lök" är en och samma. Här räknas
+ * däremot inte varianter som samma (vispgrädde och matlagningsgrädde är olika varor i butiken).
+ */
+export function sameShoppingItem(a: string, b: string): boolean {
+  const x = words(a, false)
+  const y = words(b, false)
+  return x.length > 0 && x.length === y.length && x.every((w, i) => sameWord(w, y[i]))
 }
 
 export interface Consumption {

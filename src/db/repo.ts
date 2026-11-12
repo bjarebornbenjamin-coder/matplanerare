@@ -1,6 +1,7 @@
 import { DEFAULT_MODEL } from '../ai/models'
 import { toISODate } from '../domain/dates'
 import { foodKey } from '../domain/food'
+import { sameShoppingItem } from '../domain/consume'
 import type { AiConfig, Backup, FoodSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
 import { db } from './db'
 
@@ -91,16 +92,17 @@ export interface ShoppingDraft {
 
 export async function addShoppingItems(drafts: ShoppingDraft[], today = toISODate(new Date())): Promise<{ added: number; skipped: number }> {
   return db.transaction('rw', db.shopping, async () => {
-    const open = new Set((await db.shopping.toArray()).filter((i) => !i.done).map((i) => foodKey(i.name)))
+    // Samma vara under ett annat namn ("Lök" när "Gul lök" redan står där) läggs inte till igen.
+    const open = (await db.shopping.toArray()).filter((i) => !i.done).map((i) => i.name)
     let added = 0
     let skipped = 0
     for (const d of drafts) {
       const name = d.name.trim()
-      if (!name || open.has(foodKey(name))) {
+      if (!name || open.some((o) => foodKey(o) === foodKey(name) || sameShoppingItem(o, name))) {
         skipped++
         continue
       }
-      open.add(foodKey(name))
+      open.push(name)
       await db.shopping.add({
         id: newId(),
         name,

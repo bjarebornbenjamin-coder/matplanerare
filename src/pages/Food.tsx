@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AiProgress } from '../components/AiProgress'
 import { planShopping } from '../ai/shoppingPlan'
@@ -7,6 +7,7 @@ import { PantryForm } from '../components/PantryForm'
 import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, replaceOpenShopping, runOut, saveShoppingItem } from '../db/repo'
 import { toISODate } from '../domain/dates'
 import { tidyAmount } from '../domain/shoppingName'
+import { mergeShopping } from '../domain/shoppingMerge'
 import { expiryLabel, expiryStatus, expiringWithin, sortPantry } from '../domain/food'
 import type { PantryItem } from '../domain/types'
 import { useAiConfig, useFieldError, useNow, usePantry, useShopping } from '../hooks'
@@ -79,6 +80,18 @@ export function ShoppingTab() {
   const pantry = usePantry()
   const config = useAiConfig()
   const { error, fail, touch } = useFieldError()
+
+  // Samma vara på flera rader ("gul lök", "hackad gul lök", "Lök") slås ihop när listan öppnas.
+  // Det görs en gång per besök, så att Ångra inte genast görs om.
+  const merged = useRef(false)
+  useEffect(() => {
+    if (!shopping || merged.current) return
+    merged.current = true
+    const r = mergeShopping(shopping.filter((i) => !i.done))
+    if (!r.changed) return
+    void undoable(r.merged > 0 ? `${r.merged} ${r.merged === 1 ? 'dubblett' : 'dubbletter'} på inköpslistan slogs ihop` : 'Inköpslistan städades', ['shopping'], () => replaceOpenShopping(r.lines))
+  }, [shopping])
+
   if (!shopping) return null
 
   const open = shopping.filter((i) => !i.done).sort((a, b) => a.addedAt.localeCompare(b.addedAt) || a.name.localeCompare(b.name, 'sv'))
@@ -150,7 +163,7 @@ export function ShoppingTab() {
       )}
       <div className="list-head">
         <p className="muted">{open.length === 0 ? 'Inköpslistan är tom.' : `${open.length} att köpa`}</p>
-        {open.length > 1 && <button type="button" className="btn text" disabled={tidying} onClick={tidy}>{tidying ? 'Städar…' : 'Städa listan'}</button>}
+        {open.length > 1 && <button type="button" className="btn" disabled={tidying} onClick={tidy}>{tidying ? 'Städar…' : 'Städa med AI'}</button>}
       </div>
       <AiProgress active={tidying} expected={12} label="Slår ihop och rensar listan" />
       {open.map(row)}
