@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sameShoppingItem } from './consume'
-import { addAmounts, mergeRows, mergeShopping } from './shoppingMerge'
+import { addAmounts, mergeRows, mergeShopping, uncoveredNeeds } from './shoppingMerge'
 
 describe('ihopslagning av inköpslistan', () => {
   it('lök på tre ställen blir en rad', () => {
@@ -37,7 +37,7 @@ describe('ihopslagning av inköpslistan', () => {
     expect(addAmounts(['200 g', '300 g', '1 kg'])).toBe('1,5 kg')
     expect(addAmounts(['2 dl', '3 dl'])).toBe('5 dl')
     expect(addAmounts(['1', '2 st', undefined])).toBe('3 st')
-    expect(addAmounts(['1 burk', '1 burk', '400 g'])).toBe('400 g + 1 burk')
+    expect(addAmounts(['1 burk', '1 burk', '400 g'])).toBe('400 g + 2 burkar') // två recept som vill ha en burk var = två burkar
     expect(addAmounts(['1 bit', ''])).toBeUndefined()
   })
   it('avdelningen från AI:n följer med vid ihopslagning', () => {
@@ -59,5 +59,48 @@ describe('ihopslagning av inköpslistan', () => {
     const lines = [{ name: 'Ätmogna bananer', amount: '3 st' }, { name: 'Mjölk' }, { name: 'Bananer', amount: '2 st', section: 'Frukt & grönt' }]
     expect(mergeRows(lines, [{ rows: [0, 2] }])).toEqual([{ name: 'Bananer', amount: '5 st', section: 'Frukt & grönt' }, { name: 'Mjölk' }])
     expect(mergeRows(lines, [{ rows: [0] }, { rows: [1, 7] }])).toEqual(lines)
+  })
+  describe('menyn läggs på listan', () => {
+    const needs = [
+      { name: 'Gul lök', amount: '1 st', dish: 'Pyttipanna' },
+      { name: 'Lök', amount: '1 st', dish: 'Laxsoppa' },
+      { name: 'Gul lök', amount: '1 st', dish: 'Köttfärssås' },
+      { name: 'Bladspenat', amount: '65 g', dish: 'Laxsoppa' },
+      { name: 'Spenat', amount: '100 g', dish: 'Köttfärssås' },
+      { name: 'Franska örter', dish: 'Laxsoppa' },
+    ]
+    it('samma vara från flera rätter räknas ihop: ingen mängd tappas', () => {
+      expect(uncoveredNeeds(needs, [])).toEqual([
+        { name: 'Gul lök', amount: '3 st', note: 'Pyttipanna, Laxsoppa, Köttfärssås' },
+        { name: 'Bladspenat', amount: '165 g', note: 'Laxsoppa, Köttfärssås' },
+        { name: 'Franska örter', note: 'Laxsoppa' },
+      ])
+    })
+    it('det som redan lagts till för en rätt räknas inte en gång till', () => {
+      const list = uncoveredNeeds(needs, [])
+      expect(uncoveredNeeds(needs, list)).toEqual([])
+      // Även när raden har fått ett annat namn eller är avbockad.
+      expect(uncoveredNeeds(needs, [{ name: 'Lök', note: 'Pyttipanna, Laxsoppa, Köttfärssås' }, { name: 'Spenat', note: 'Laxsoppa, Köttfärssås' }, { name: 'Franska örter', note: 'Laxsoppa' }])).toEqual([])
+    })
+    it('en ny rätt läggs till även om varan redan står på listan', () => {
+      const list = [{ name: 'Gul lök', note: 'Pyttipanna' }, { name: 'Lök' }, { name: 'Mjölk' }]
+      expect(uncoveredNeeds(needs.slice(0, 3), list)).toEqual([{ name: 'Gul lök', amount: '2 st', note: 'Laxsoppa, Köttfärssås' }])
+    })
+    it('äldre rader som inte säger vilka rätter räknas som täckta, så att inget dubbleras', () => {
+      expect(uncoveredNeeds(needs.slice(0, 3), [{ name: 'Gul lök', note: 'Veckomeny: 3 rätter' }])).toEqual([])
+    })
+    it('alla rätter ryms på raden', () => {
+      const many = Array.from({ length: 14 }, (_, i) => ({ name: 'Lök', amount: '1 st', dish: `En ganska lång rätt nummer ${i + 1}` }))
+      const [row] = uncoveredNeeds(many, [])
+      expect(row.amount).toBe('14 st')
+      expect(uncoveredNeeds(many, [row])).toEqual([])
+    })
+  })
+  it('förpackningar räknas ihop i stället för att tappas', () => {
+    expect(addAmounts(['1 kruka', '1 kruka'])).toBe('2 krukor')
+    expect(addAmounts(['1 burk', '2 burkar', '400 g'])).toBe('400 g + 3 burkar')
+    expect(addAmounts(['1 paket'])).toBe('1 paket')
+    expect(addAmounts(['2 klyftor', '1 klyfta', '1 knippe'])).toBe('3 klyftor + 1 knippe')
+    expect(addAmounts(['2 burkar à 400 g', '2 burkar à 400 g'])).toBe('2 burkar à 400 g') // går inte att räkna: lämnas
   })
 })

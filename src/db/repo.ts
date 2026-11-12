@@ -121,6 +121,25 @@ export async function addShoppingItems(drafts: ShoppingDraft[], today = toISODat
   })
 }
 
+/** Lägger till rader utan att jämföra med listan. Samma vara slås ihop när listan städas. */
+export async function appendShoppingItems(drafts: ShoppingDraft[], today = toISODate(new Date())): Promise<number> {
+  const stamp = new Date().toISOString()
+  const items = drafts
+    .filter((d) => d.name.trim())
+    .map((d) => ({
+      id: newId(),
+      name: d.name.trim(),
+      ...(d.amount?.trim() ? { amount: d.amount.trim() } : {}),
+      ...(d.note?.trim() ? { note: d.note.trim() } : {}),
+      ...(isSection(d.section) ? { section: d.section } : {}),
+      done: false,
+      addedAt: today,
+      updatedAt: stamp,
+    }))
+  await db.shopping.bulkAdd(items)
+  return items.length
+}
+
 /**
  * Ersätter det som inte är köpt med en ny, sammanslagen lista. Köpta varor rörs inte. En vara
  * som finns kvar behåller sitt id (och när den lades till), så att synken inte ser den som ny.

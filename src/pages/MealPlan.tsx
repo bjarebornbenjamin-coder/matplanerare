@@ -2,16 +2,16 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AiProgress } from '../components/AiProgress'
 import { DoneButton } from '../components/DoneButton'
 import { Link } from 'react-router-dom'
-import { boxSides, fetchVariedMealPlan, missingForPlan, planDays, planStart } from '../ai/mealPlan'
+import { boxSides, fetchVariedMealPlan, missingForPlan, missingNeeds, planDays, planStart } from '../ai/mealPlan'
+import { uncoveredNeeds } from '../domain/shoppingMerge'
 import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
-import { addShoppingItems, dishId, getSettings, markEaten, rateDish, replaceOpenShopping, saveSettings } from '../db/repo'
+import { appendShoppingItems, dishId, getSettings, markEaten, rateDish, saveSettings } from '../db/repo'
 import { ConsumeDialog } from '../components/ConsumeDialog'
 import { CookingOverlay, type CookRow } from '../components/CookingOverlay'
 import { consumption, type Consumption } from '../domain/consume'
-import { planShopping } from '../ai/shoppingPlan'
-import { rememberTidied } from '../lib/shoppingTidy'
+import { tidyShopping } from '../lib/shoppingTidy'
 import { WEEKDAYS_LONG, WEEKDAYS_SHORT, addDays, dayLabel, parseISODate, toHHmm, toISODate, weekdayOf } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
 import { httpsUrl, recipeSearchUrl } from '../domain/recipeLink'
@@ -208,24 +208,20 @@ export function MealPlanTab() {
   }
 
   /**
-   * AI:n räknar ihop hela veckans ingredienser mot lagret och listan: rena namn, inga dubbletter,
-   * mängder som går att köpa. Går det inte läggs det som saknas till som förut.
+   * Lägger det som saknas för hela veckan på inköpslistan och städar den sedan: samma vara slås
+   * ihop och mängderna summeras. Inget som redan står på listan tas bort.
    */
   async function shop() {
     setShopping(true)
     try {
-      const withRecipe = [...upcoming.filter((d) => d.url && !d.eaten), ...upcomingSides.filter((x) => !x.fromBatch && x.url && !x.eaten)]
-      const needs = withRecipe.flatMap((d) => d.ingredients.map((i) => ({ name: i.name, amount: i.amount, dish: d.title })))
-      const current = (await db.shopping.toArray()).filter((i) => !i.done)
-      try {
-        const lines = await planShopping({ needs, pantry: pantry!, current, aliases: settings!.food.aliases }, config?.model ?? 'gpt-4o-mini', await authHeaders())
-        await undoable('Inköpslistan är uppdaterad', ['shopping'], () => replaceOpenShopping(lines))
-        rememberTidied(lines) // AI:n har redan gått igenom de här raderna
-        setMessage(`Inköpslistan har ${lines.length} varor, sammanräknade för hela veckan.`)
-      } catch {
-        const { added, skipped } = await addShoppingItems(missing)
-        setMessage(`AI:n kunde inte räkna ihop listan just nu, så det som saknas lades till som det är. ${added ? `${added} varor på inköpslistan${skipped ? ` (${skipped} fanns redan)` : ''}.` : 'Allt fanns redan på inköpslistan.'}`)
+      const recipes = [...upcoming.filter((d) => d.url && !d.eaten), ...upcomingSides.filter((x) => !x.fromBatch && x.url && !x.eaten)]
+      // Det som redan lagts till för en rätt (även det som är avbockat) räknas inte en gång till.
+      const lines = uncoveredNeeds(missingNeeds(recipes, pantry!), await db.shopping.toArray(), settings!.food.aliases)
+      if (lines.length) {
+        await appendShoppingItems(lines)
+        await tidyShopping()
       }
+      setMessage(lines.length ? `${lines.length} ${lines.length === 1 ? 'vara' : 'varor'} lades på inköpslistan. Samma vara slås ihop och mängderna räknas samman.` : 'Allt fanns redan på inköpslistan.')
     } finally {
       setShopping(false)
     }

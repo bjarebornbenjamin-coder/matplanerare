@@ -257,6 +257,21 @@ export function missingForPlan(plan: { title: string; ingredients: { name: strin
   })
 }
 
+/**
+ * Det som saknas hemma, rätt för rätt: en rad per ingrediens och rätt, med rensat namn. Används
+ * när menyn läggs på inköpslistan, där samma vara sedan slås ihop och mängderna summeras.
+ */
+export function missingNeeds(plan: { title: string; ingredients: { name: string; amount: string }[] }[], pantry: PantryItem[]): { name: string; amount?: string; dish: string }[] {
+  return plan.flatMap((d) =>
+    withPantryStatus(d.ingredients, pantry)
+      .filter((i) => i.status === 'missing')
+      .map((i) => {
+        const amount = shoppingAmount(i.amount)
+        return { name: cleanName(i.name), ...(amount ? { amount } : {}), dish: d.title }
+      }),
+  )
+}
+
 /** Första dagen i menyn: idag före 17, annars imorgon. */
 export function planStart(today: ISODate, nowTime: string): ISODate {
   return nowTime < '17:00' ? today : addDays(today, 1)

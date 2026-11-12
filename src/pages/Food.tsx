@@ -6,11 +6,11 @@ import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, 
 import { toISODate } from '../domain/dates'
 import { tidyAmount } from '../domain/shoppingName'
 import { SECTIONS, sectionFor } from '../domain/storeSection'
-import { mergeByHand, tidyShopping, useShoppingTidy } from '../lib/shoppingTidy'
+import { mergeByHand, restoreBeforeTidy, tidyShopping, useShoppingTidy } from '../lib/shoppingTidy'
 import { expiryLabel, expiryStatus, expiringWithin, sortPantry } from '../domain/food'
 import type { PantryItem } from '../domain/types'
 import { useFieldError, useNow, usePantry, useShopping } from '../hooks'
-import { undoable } from '../lib/undo'
+import { showToast, undoable } from '../lib/undo'
 
 function RunOutDialog({ item, onClose }: { item: PantryItem; onClose: () => void }) {
   const done = async (addToList: boolean) => {
@@ -139,7 +139,7 @@ export function ShoppingTab() {
         <input type="checkbox" aria-label={`Välj ${i.name}`} checked={picked.has(i.id)} onChange={() => togglePick(i.id)} />
         <div className="task-main" style={{ cursor: 'pointer' }}>
           <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
-          {i.note && <span className="sub">{i.note}</span>}
+          {i.note && <span className="sub note">{i.note}</span>}
         </div>
       </label>
     ) : (
@@ -147,7 +147,7 @@ export function ShoppingTab() {
         <input type="checkbox" aria-label={`Köpt: ${i.name}`} checked={i.done} onChange={(e) => saveShoppingItem({ ...i, done: e.target.checked })} />
         <div className="task-main" style={{ cursor: 'default' }}>
           <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
-          {i.note && <span className="sub">{i.note}</span>}
+          {i.note && <span className="sub note">{i.note}</span>}
         </div>
         <button type="button" className="btn" aria-label={`Ta bort ${i.name}`} onClick={() => undoable(`${i.name} är borttagen från listan`, ['shopping'], () => deleteShoppingItem(i.id))}>Ta bort</button>
       </div>
@@ -199,7 +199,16 @@ export function ShoppingTab() {
           </div>
         </div>
       )}
-      <AiProgress active={tidy.running} expected={20} label="AI:n går igenom listan" />
+      <AiProgress active={tidy.running} expected={10} label="Listan gås igenom" />
+      {tidy.restore && !tidy.running && !picked && (
+        <p className="muted tidy-note">
+          <span>
+            Städades kl. {new Date(tidy.restore.at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+            {tidy.restore.to < tidy.restore.from ? ` · ${tidy.restore.from} rader blev ${tidy.restore.to}` : ''}
+          </span>
+          <button type="button" className="btn text" onClick={async () => { await restoreBeforeTidy(); showToast('Listan är som den var före städningen') }}>Återställ</button>
+        </p>
+      )}
       {tidy.message && !tidy.running && (
         <div className="warning" role="alert">
           <p>{tidy.message}</p>

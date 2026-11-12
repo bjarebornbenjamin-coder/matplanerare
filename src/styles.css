@@ -802,7 +802,7 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 .shop-text { flex: 1; min-width: 0; }
 .shop-name { display: block; font-size: 18px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; text-decoration: line-through; text-decoration-color: transparent; transition: color 220ms ease 100ms, text-decoration-color 220ms ease 100ms; }
 .is-leaving .shop-name { color: var(--muted); text-decoration-color: currentColor; }
-.shop-sub { display: block; margin-top: 2px; font-size: 14px; color: var(--muted); }
+.shop-sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; font-size: 14px; color: var(--muted); }
 
 .shop-basket { margin-top: 22px; border-radius: 18px; background: var(--surface-2, var(--surface)); }
 .shop-basket-head { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 0 16px; border: 0; background: none; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; border-radius: 18px; }
@@ -851,3 +851,5 @@ h2.list-section { margin: 14px 4px 6px; }
 .card.task.pick { cursor: pointer; }
 .card.task.pick.is-picked { outline: 2px solid var(--primary); outline-offset: -2px; }
 .warning .btn { margin-top: 6px; }
+.tidy-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 0 4px; font-size: 14px; }
+.tidy-note .btn { flex: none; margin: 0; }
