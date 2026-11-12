@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { parseBackup } from './backup'
 import { db } from './db'
-import { markEaten, rateDish, replaceOpenShopping, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
+import { markEaten, rateDish, replaceOpenShopping, addPantryItems, addShoppingItems, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
 
 beforeEach(async () => {
-  await Promise.all([db.settings.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
+  await Promise.all([db.settings.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
 })
 
 describe('export och import', () => {
@@ -12,18 +12,16 @@ describe('export och import', () => {
     await saveSettings({ memories: ['Gillar inte svamp'], food: { ...(await getSettings()).food, allergies: 'nötter', quickWeekdays: [2, 4] } })
     await db.pantry.put({ id: 'p1', name: 'Mjölk', amount: '1 l', expires: '2026-11-12', addedAt: '2026-11-08', source: 'receipt', updatedAt: '' })
     await db.shopping.put({ id: 's1', name: 'Ägg', done: false, addedAt: '2026-11-08', updatedAt: '' })
-    await addWater('2026-11-10', 500)
     await db.mealPlan.put({ id: '2026-11-11', date: '2026-11-11', title: 'Pasta carbonara', reason: '', portions: 2, minutes: 25, ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: [], url: 'https://www.ica.se/recept/x/', site: 'ica.se', updatedAt: '' })
     await db.sides.put({ id: '2026-11-12:lunch', date: '2026-11-12', slot: 'lunch', title: 'Pasta carbonara', portions: 1, minutes: null, ingredients: [], fromBatch: '2026-11-11', updatedAt: '' })
     const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
-    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
+    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
     await importAll(backup)
     const s = await getSettings()
     expect(s.memories).toEqual(['Gillar inte svamp'])
     expect(s.food).toMatchObject({ allergies: 'nötter', quickWeekdays: [2, 4] })
     expect((await db.pantry.get('p1'))?.expires).toBe('2026-11-12')
     expect((await db.shopping.get('s1'))?.name).toBe('Ägg')
-    expect((await db.water.get('2026-11-10'))?.ml).toBe(500)
     expect(await db.sides.get('2026-11-12:lunch')).toMatchObject({ slot: 'lunch', fromBatch: '2026-11-11' })
     expect(await db.mealPlan.get('2026-11-11')).toMatchObject({ title: 'Pasta carbonara', url: 'https://www.ica.se/recept/x/' })
   })
@@ -31,7 +29,7 @@ describe('export och import', () => {
     expect(() => parseBackup({ app: 'studieassistent', version: 8 })).toThrow(/Matplaneraren/)
     expect(() => parseBackup({ app: 'matplanerare', version: 2 })).toThrow(/version/)
     expect(() => parseBackup({ app: 'matplanerare', version: 1, pantry: [{ id: 'x', name: '', addedAt: '2026-11-08' }] })).toThrow(/matvara/)
-    expect(parseBackup({ app: 'matplanerare', version: 1 })).toMatchObject({ pantry: [], shopping: [], water: [], mealPlan: [], settings: null })
+    expect(parseBackup({ app: 'matplanerare', version: 1 })).toMatchObject({ pantry: [], shopping: [], mealPlan: [], settings: null })
   })
 })
 
@@ -72,24 +70,13 @@ describe('inköpslista', () => {
 
 describe('addPantryItems', () => {
   it('sparar varor med källa och datum, och rensar samma varor från inköpslistan', async () => {
-    await Promise.all([db.pantry.clear(), db.shopping.clear(), db.water.clear()])
+    await Promise.all([db.pantry.clear(), db.shopping.clear()])
     await addShoppingItems([{ name: 'Mjölk' }, { name: 'Ägg' }, { name: 'Bröd' }])
     const r = await addPantryItems([{ name: ' mjölk ', amount: '1 l', expires: '2026-11-17' }, { name: 'Ris' }, { name: '  ' }], 'receipt', { clearFromList: true, today: '2026-11-10' })
     expect(r).toEqual({ added: 2, removedFromList: 1 })
     const items = await db.pantry.toArray()
     expect(items.find((i) => i.name === 'mjölk')).toMatchObject({ amount: '1 l', expires: '2026-11-17', source: 'receipt', addedAt: '2026-11-10' })
     expect((await db.shopping.toArray()).map((i) => i.name).sort()).toEqual(['Bröd', 'Ägg'])
-  })
-})
-
-describe('vatten', () => {
-  it('vatten läggs ihop per dag, kan inte bli negativt och begränsas uppåt', async () => {
-    await db.water.clear()
-    expect(await addWater('2026-11-10', 250)).toBe(250)
-    expect(await addWater('2026-11-10', 250)).toBe(500)
-    expect(await addWater('2026-11-10', -1000)).toBe(0)
-    expect(await addWater('2026-11-10', 99_999)).toBe(20_000)
-    expect(await db.water.count()).toBe(1)
   })
 })
 

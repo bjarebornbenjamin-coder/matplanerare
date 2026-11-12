@@ -27,18 +27,10 @@ export interface FoodSettings {
   expiry: { enabled: boolean; time: HHmm }
 }
 
-/** Vattenmål. Fältet heter nutrition av historiska skäl (synkas med samma namn). */
-export interface NutritionSettings {
-  waterMl: number
-  /** Storlek på ett glas vatten för snabbknappen. */
-  glassMl: number
-}
-
 export interface Settings {
   id: 'main'
   theme: Theme
   food: FoodSettings
-  nutrition: NutritionSettings
   /** Saker användaren bett assistenten komma ihåg (preferenser). */
   memories: string[]
 }
@@ -62,14 +54,6 @@ export interface ShoppingItem {
   /** Varifrån varan kom, t.ex. receptets namn. */
   note?: string
   addedAt: ISODate
-  updatedAt: string
-}
-
-/** Dagens vatten. id = datum, så en rad per dag. */
-export interface WaterDay {
-  id: ISODate
-  date: ISODate
-  ml: number
   updatedAt: string
 }
 
@@ -147,7 +131,6 @@ export interface Backup {
   settings: Settings | null
   pantry: PantryItem[]
   shopping: ShoppingItem[]
-  water: WaterDay[]
   mealPlan: PlannedDinner[]
   sides: PlannedSide[]
   ratings: DishRating[]

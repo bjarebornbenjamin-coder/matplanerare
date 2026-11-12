@@ -1,5 +1,5 @@
-import { DEFAULT_FOOD, DEFAULT_NUTRITION } from './repo'
-import type { Backup, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem, WaterDay } from '../domain/types'
+import { DEFAULT_FOOD } from './repo'
+import type { Backup, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem } from '../domain/types'
 
 const fail = (msg: string): never => {
   throw new Error(`Ogiltig säkerhetskopia: ${msg}`)
@@ -34,14 +34,8 @@ function parseSettings(v: unknown): Settings {
     },
     expiry: { enabled: typeof ex.enabled === 'boolean' ? ex.enabled : DEFAULT_FOOD.expiry.enabled, time: isTime(ex.time) ? (ex.time as string) : DEFAULT_FOOD.expiry.time },
   }
-  const nu = isObj(v.nutrition) ? v.nutrition : {}
-  const n = (x: unknown, min: number, max: number, d: number) => (typeof x === 'number' && x >= min && x <= max ? Math.round(x) : d)
-  const nutrition = {
-    waterMl: n(nu.waterMl, 0, 20000, DEFAULT_NUTRITION.waterMl),
-    glassMl: n(nu.glassMl, 50, 2000, DEFAULT_NUTRITION.glassMl),
-  }
   const memories = Array.isArray(v.memories) ? v.memories.filter((m): m is string => isStr(m) && m.trim() !== '').map((m) => m.trim().slice(0, 200)).slice(0, 30) : []
-  return { id: 'main', theme, food, nutrition, memories }
+  return { id: 'main', theme, food, memories }
 }
 
 const SOURCES = ['manual', 'receipt', 'fridge', 'shopping']
@@ -74,13 +68,6 @@ function parseShopping(v: unknown): ShoppingItem {
 }
 
 const num = (v: unknown, min: number, max: number): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined)
-
-function parseWater(v: unknown): WaterDay {
-  if (!isObj(v) || !isDate(v.date) || v.id !== v.date) return fail('vattenrad')
-  const ml = num(v.ml, 0, 20000)
-  if (ml === undefined) return fail('vattenmängd')
-  return { id: v.date as string, date: v.date as string, ml: Math.round(ml), updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString() }
-}
 
 function parseDinner(v: unknown): PlannedDinner {
   if (!isObj(v) || !isDate(v.date) || v.id !== v.date || !isStr(v.title) || !v.title.trim()) return fail('middag i veckomenyn')
@@ -145,7 +132,6 @@ export function parseBackup(json: unknown): Backup {
     settings: json.settings == null ? null : parseSettings(json.settings),
     pantry: list(json.pantry, parsePantry),
     shopping: list(json.shopping, parseShopping),
-    water: list(json.water, parseWater),
     mealPlan: list(json.mealPlan, parseDinner),
     sides: list(json.sides, parseSide),
     ratings: list(json.ratings, parseRating),

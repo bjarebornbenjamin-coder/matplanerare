@@ -1,7 +1,7 @@
 import { DEFAULT_MODEL } from '../ai/models'
 import { toISODate } from '../domain/dates'
 import { foodKey } from '../domain/food'
-import type { AiConfig, Backup, FoodSettings, NutritionSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
+import type { AiConfig, Backup, FoodSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
 import { db } from './db'
 
 export const newId = () => crypto.randomUUID()
@@ -19,8 +19,6 @@ export const DEFAULT_FOOD: FoodSettings = {
   shopping: { enabled: true, weekday: 5, time: '16:00' },
   expiry: { enabled: true, time: '08:00' },
 }
-
-export const DEFAULT_NUTRITION: NutritionSettings = { waterMl: 2000, glassMl: 250 }
 
 export async function getAiConfig(): Promise<AiConfig> {
   return (await db.aiConfig.get('main')) ?? { id: 'main', password: '', model: DEFAULT_MODEL }
@@ -179,17 +177,8 @@ export async function runOut(pantryId: string, addToList: boolean): Promise<void
   await db.pantry.delete(pantryId)
 }
 
-export async function addWater(date: string, deltaMl: number): Promise<number> {
-  return db.transaction('rw', db.water, async () => {
-    const current = (await db.water.get(date))?.ml ?? 0
-    const ml = Math.max(0, Math.min(20_000, Math.round(current + deltaMl)))
-    await db.water.put({ id: date, date, ml, updatedAt: new Date().toISOString() })
-    return ml
-  })
-}
-
 export function defaultSettings(): Settings {
-  return { id: 'main', theme: 'system', food: DEFAULT_FOOD, nutrition: DEFAULT_NUTRITION, memories: [] }
+  return { id: 'main', theme: 'system', food: DEFAULT_FOOD, memories: [] }
 }
 
 /** Äldre sparade inställningar saknar fält som tillkommit senare. */
@@ -200,7 +189,6 @@ export function withDefaults(stored: Settings | undefined): Settings {
   return {
     ...d,
     ...stored,
-    nutrition: { ...DEFAULT_NUTRITION, ...(stored.nutrition ?? {}) },
     memories: Array.isArray(stored.memories) ? stored.memories : [],
     food: { ...DEFAULT_FOOD, ...food, shopping: { ...DEFAULT_FOOD.shopping, ...(food.shopping ?? {}) }, expiry: { ...DEFAULT_FOOD.expiry, ...(food.expiry ?? {}) } },
   }
@@ -224,7 +212,6 @@ export async function exportAll(): Promise<Backup> {
     settings: (await db.settings.get('main')) ?? null,
     pantry: await db.pantry.toArray(),
     shopping: await db.shopping.toArray(),
-    water: await db.water.toArray(),
     mealPlan: await db.mealPlan.toArray(),
     sides: await db.sides.toArray(),
     ratings: await db.ratings.toArray(),
@@ -233,12 +220,11 @@ export async function exportAll(): Promise<Backup> {
 
 /** Ersätter all data med innehållet i säkerhetskopian. */
 export async function importAll(backup: Backup): Promise<void> {
-  await db.transaction('rw', [db.settings, db.pantry, db.shopping, db.water, db.mealPlan, db.sides, db.ratings], async () => {
-    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
+  await db.transaction('rw', [db.settings, db.pantry, db.shopping, db.mealPlan, db.sides, db.ratings], async () => {
+    await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
     if (backup.settings) await db.settings.put(backup.settings)
     await db.pantry.bulkPut(backup.pantry)
     await db.shopping.bulkPut(backup.shopping)
-    await db.water.bulkPut(backup.water)
     await db.mealPlan.bulkPut(backup.mealPlan)
     await db.sides.bulkPut(backup.sides)
     await db.ratings.bulkPut(backup.ratings)

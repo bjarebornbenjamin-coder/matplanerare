@@ -1,41 +1,18 @@
-import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { addWater } from '../db/repo'
 import { httpsUrl } from '../domain/recipeLink'
 import { withPantryStatus } from '../ai/recipes'
 import { WEEKDAYS_SHORT, addDays, parseISODate, toISODate, weekdayOf, daysBetween } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
-import { useMealPlan, useNow, usePantry, useSettings, useShopping, useWater } from '../hooks'
-
-const liters = (ml: number) => (ml / 1000).toLocaleString('sv-SE', { maximumFractionDigits: 2 })
-const R = 34
-const C = 2 * Math.PI * R
-
-/** Ring som fylls mot ett mål. */
-function Ring({ value, goal, color, children }: { value: number; goal: number; color: string; children: ReactNode }) {
-  const len = goal > 0 ? Math.min(1, value / goal) * C : 0
-  return (
-    <div className="ring" aria-hidden="true">
-      <svg viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r={R} className="ring-track" />
-        {len > 0 && <circle cx="40" cy="40" r={R} className="ring-seg" stroke={color} strokeDasharray={`${len} ${C}`} />}
-      </svg>
-      <div className="ring-center">{children}</div>
-    </div>
-  )
-}
+import { useMealPlan, useNow, usePantry, useSettings, useShopping } from '../hooks'
 
 export function Dashboard() {
   const settings = useSettings()
   const plan = useMealPlan()
   const pantry = usePantry()
   const shopping = useShopping()
-  const water = useWater()
   const today = toISODate(useNow())
-  if (!settings || !plan || !pantry || !shopping || !water) return null
+  if (!settings || !plan || !pantry || !shopping) return null
 
-  const g = settings.nutrition
-  const ml = water.find((w) => w.date === today)?.ml ?? 0
   const tonight = plan.find((d) => d.date === today)
   const lacking = tonight ? withPantryStatus(tonight.ingredients, pantry).filter((i) => i.status === 'missing').length : 0
   const expiring = expiringWithin(pantry, today)
@@ -72,20 +49,6 @@ export function Dashboard() {
             </div>
           </>
         )}
-      </section>
-
-      <section className="water" aria-label="Vatten idag">
-        <Ring value={ml} goal={g.waterMl} color="var(--viz-water)">
-          <span className="ring-value">{Math.round(g.waterMl > 0 ? (ml / g.waterMl) * 100 : 0)}%</span>
-        </Ring>
-        <div className="water-body">
-          <div className="water-title">Vatten idag</div>
-          <div className="sub num" aria-live="polite">{liters(ml)} av {liters(g.waterMl)} l</div>
-          <div className="water-actions">
-            <button type="button" className="btn primary" onClick={() => addWater(today, g.glassMl)}>+ Glas</button>
-            <button type="button" className="btn" aria-label="Ta bort ett glas" disabled={ml === 0} onClick={() => addWater(today, -g.glassMl)}>−</button>
-          </div>
-        </div>
       </section>
 
       <div className="stats">

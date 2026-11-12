@@ -588,16 +588,6 @@ details.plan-options[open] summary { margin-bottom: 8px; }
 html { scroll-behavior: smooth; scroll-padding-top: 16px; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
-/* Vatten på startsidan */
-.water { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: 20px; background: var(--surface-2, var(--surface)); }
-.water .ring { flex: 0 0 76px; }
-.water .ring svg, .water .ring-center { max-width: 76px; }
-.water .ring-value { font-size: 15px; }
-.water-body { flex: 1; min-width: 0; }
-.water-title { font-weight: 600; }
-.water-actions { display: flex; gap: 8px; margin-top: 8px; }
-.water-actions .btn:last-child { min-width: 44px; }
-
 /* Middagskort i veckomenyn */
 .dinner { padding: 16px; margin-bottom: 10px; border-radius: 18px; background: var(--surface-2, var(--surface)); scroll-margin-top: 16px; }
 .dinner-date { flex: 0 0 52px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 14px; background: var(--surface, #fff); }
