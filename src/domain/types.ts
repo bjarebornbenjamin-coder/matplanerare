@@ -125,6 +125,8 @@ export interface PlannedDinner {
   /** Riktigt recept från nätet; då är ingredienserna receptsidans. */
   url?: string
   site?: string
+  /** Receptsidans bild på rätten (https). */
+  image?: string
   /** Markerad med "Jag åt detta": ingredienserna är avdragna från lagret. */
   eaten?: boolean
   updatedAt: string

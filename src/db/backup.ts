@@ -98,6 +98,7 @@ function parseDinner(v: unknown): PlannedDinner {
     steps,
     ...(num(v.boxes, 1, 30) !== undefined ? { boxes: Math.round(v.boxes as number) } : {}),
     ...(isStr(v.url) && v.url.startsWith('https://') ? { url: v.url.slice(0, 500), ...(isStr(v.site) ? { site: v.site.slice(0, 60) } : {}) } : {}),
+    ...(isStr(v.image) && v.image.startsWith('https://') ? { image: v.image.slice(0, 500) } : {}),
     ...(v.eaten === true ? { eaten: true } : {}),
     updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
   }

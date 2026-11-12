@@ -12,6 +12,15 @@ beforeEach(() => resetRateLimit())
 describe('receptsidor', () => {
   it('läser receptet ur JSON-LD, även i @graph', () => {
     expect(recipeFromHtml(page(carbonara))).toEqual({ title: 'Pasta carbonara', ingredients: ['400 g spaghetti', '150 g bacon', '3 ägg', '1 dl riven parmesan'], servings: '4 portioner', minutes: 25, image: 'https://x.se/a.jpg' })
+    // Bilden kan anges som adress, som objekt eller som lista av någon av dem; bara https tas med.
+    const withImage = (image: unknown) => recipeFromHtml(page({ '@type': 'Recipe', name: 'X', recipeIngredient: ['1 st lök'], image }))?.image
+    expect(withImage('https://x.se/b.jpg')).toBe('https://x.se/b.jpg')
+    expect(withImage(['https://x.se/c.jpg', 'https://x.se/d.jpg'])).toBe('https://x.se/c.jpg')
+    expect(withImage([{ '@type': 'ImageObject', url: 'https://x.se/e.jpg' }])).toBe('https://x.se/e.jpg')
+    expect(withImage({ contentUrl: 'https://x.se/f.jpg' })).toBe('https://x.se/f.jpg')
+    expect(withImage('http://x.se/osaker.jpg')).toBeUndefined()
+    expect(withImage('javascript:alert(1)')).toBeUndefined()
+    expect(withImage(undefined)).toBeUndefined()
     expect(recipeFromHtml('<html>inget recept</html>')).toBeNull()
     expect(recipeFromHtml(page({ '@type': 'Recipe', name: 'Tomt', recipeIngredient: [] }))).toBeNull()
     expect(isoMinutes('PT1H15M')).toBe(75)
