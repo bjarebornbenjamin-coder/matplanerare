@@ -6,7 +6,9 @@ import { boxSides, fetchVariedMealPlan, missingForPlan, planDays, planStart } fr
 import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
-import { addShoppingItems, dishId, getSettings, rateDish, replaceOpenShopping, saveSettings } from '../db/repo'
+import { addShoppingItems, dishId, getSettings, markEaten, rateDish, replaceOpenShopping, saveSettings } from '../db/repo'
+import { ConsumeDialog } from '../components/ConsumeDialog'
+import { consumption, type Consumption } from '../domain/consume'
 import { planShopping } from '../ai/shoppingPlan'
 import { WEEKDAYS_LONG, WEEKDAYS_SHORT, addDays, dayLabel, parseISODate, toHHmm, toISODate, weekdayOf } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
@@ -18,6 +20,8 @@ import { authHeaders } from '../lib/auth'
 import { undoable } from '../lib/undo'
 
 type RecipeTarget = { id: string; title: string; table: 'mealPlan' | 'sides' }
+/** En rätt som användaren ätit: middag, frukost, lunch eller matlåda. */
+type EatTarget = { table: 'mealPlan' | 'sides'; id: string; title: string; eaten?: boolean; ingredients: { name: string; amount: string }[] }
 
 /** Rätter som redan fått ett automatiskt receptförsök i den här sessionen. */
 const autoTried = new Set<string>()
@@ -38,6 +42,7 @@ export function MealPlanTab() {
   const [notFound, setNotFound] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
   const [shopping, setShopping] = useState(false)
+  const [eating, setEating] = useState<{ target: EatTarget; used: Consumption[] } | null>(null)
   /** Förlopp när menyn görs: uppskattning medan AI:n planerar, sedan verkligt per hämtat recept. */
   const [progress, setProgress] = useState<{ label: string; value?: number }>({ label: 'Planerar rätterna' })
   const [openIng, setOpenIng] = useState<Set<string>>(new Set())
@@ -66,7 +71,8 @@ export function MealPlanTab() {
   const upcoming = plan.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date))
   const upcomingSides = sides.filter((x) => x.date >= today)
   // Bara rätter med riktigt recept räknas; matlådor har inga egna ingredienser.
-  const missing = missingForPlan([...upcoming.filter((d) => d.url), ...upcomingSides.filter((x) => !x.fromBatch && x.url)], pantry)
+  // Uppätna rätter behöver inte handlas till.
+  const missing = missingForPlan([...upcoming.filter((d) => d.url && !d.eaten), ...upcomingSides.filter((x) => !x.fromBatch && x.url && !x.eaten)], pantry)
   const dates = [...new Set([...upcoming.map((d) => d.date), ...upcomingSides.map((x) => x.date)])].sort()
   const food = settings.food
   const saveFood = (patch: Partial<typeof food>) => saveSettings({ food: { ...food, ...patch } })
@@ -103,6 +109,17 @@ export function MealPlanTab() {
 
   findRef.current = findRecipe
 
+  /**
+   * "Jag åt detta": visar vad som dras från lagret och markerar rätten som uppäten. Använder
+   * receptet inget ur lagret (t.ex. en matlåda) markeras rätten direkt. Ett tryck till ångrar markeringen.
+   */
+  async function ate(target: EatTarget) {
+    if (target.eaten) return undoable(`${target.title} är inte längre markerad som uppäten`, [target.table], () => markEaten(target, [], false))
+    const used = consumption(target.ingredients, pantry!)
+    if (used.length === 0) return undoable(`${target.title} är markerad som uppäten`, [target.table], () => markEaten(target, []))
+    setEating({ target, used })
+  }
+
   async function generate() {
     setBusy(true)
     setError('')
@@ -116,7 +133,9 @@ export function MealPlanTab() {
       const from = planStart(today, toHHmm(now))
       const dates = Array.from({ length: days }, (_, i) => addDays(from, i))
       const recent = plan!.filter((d) => d.date < from && d.date >= addDays(from, -21)).map((d) => d.title)
-      const replacing = plan!.filter((d) => dates.includes(d.date)).map((d) => d.title)
+      // En ny meny ersätter hela den kommande menyn, inte bara de valda dagarna: väljer man
+      // 3 dagar ska det inte ligga kvar rätter från en äldre 7-dagarsmeny efteråt.
+      const replacing = plan!.filter((d) => d.date >= from).map((d) => d.title)
       const usable = pantry!.filter((p) => !p.expires || p.expires >= today)
       const planned = planDays(dates, s.food)
       const { dinners, sides: aiSides } = await fetchVariedMealPlan(
@@ -130,9 +149,9 @@ export function MealPlanTab() {
       )
       const newSides = [...aiSides, ...boxSides(planned.boxes, dinners, s.food.boxPortions)]
       const stamp = new Date().toISOString()
-      await undoable(`Veckomeny för ${dinners.length} dagar`, ['mealPlan', 'sides'], async () => {
-        await db.mealPlan.bulkDelete(dates)
-        await db.sides.bulkDelete(dates.flatMap((d) => [`${d}:breakfast`, `${d}:lunch`]))
+      await undoable(`Ny meny för ${dinners.length} ${dinners.length === 1 ? 'dag' : 'dagar'}`, ['mealPlan', 'sides'], async () => {
+        await db.mealPlan.bulkDelete(await db.mealPlan.where('date').aboveOrEqual(from).primaryKeys())
+        await db.sides.bulkDelete(await db.sides.where('date').aboveOrEqual(from).primaryKeys())
         await db.mealPlan.bulkPut(dinners.map((d) => ({ ...d, updatedAt: stamp })))
         await db.sides.bulkPut(newSides.map((x) => ({ ...x, updatedAt: stamp })))
       })
@@ -170,7 +189,7 @@ export function MealPlanTab() {
   async function shop() {
     setShopping(true)
     try {
-      const withRecipe = [...upcoming.filter((d) => d.url), ...upcomingSides.filter((x) => !x.fromBatch && x.url)]
+      const withRecipe = [...upcoming.filter((d) => d.url && !d.eaten), ...upcomingSides.filter((x) => !x.fromBatch && x.url && !x.eaten)]
       const needs = withRecipe.flatMap((d) => d.ingredients.map((i) => ({ name: i.name, amount: i.amount, dish: d.title })))
       const current = (await db.shopping.toArray()).filter((i) => !i.done)
       try {
@@ -285,7 +304,7 @@ export function MealPlanTab() {
         const sideRows = daySides.length > 0 && (
           <div className="sides">
             {daySides.map((x) => (
-              <SideRow key={x.id} side={x} dinners={upcoming.concat(plan.filter((p) => p.date < today))} pantry={pantry} expiring={expiring} finding={finding.has(x.id)} notFound={notFound.has(x.id)} onFind={async () => findRecipe({ id: x.id, title: x.title, table: 'sides' }, await authHeaders())} />
+              <SideRow key={x.id} side={x} dinners={upcoming.concat(plan.filter((p) => p.date < today))} pantry={pantry} expiring={expiring} finding={finding.has(x.id)} notFound={notFound.has(x.id)} onAte={() => ate({ table: 'sides', id: x.id, title: x.fromBatch ? `Matlåda: ${x.title}` : x.title, eaten: x.eaten, ingredients: x.ingredients })} onFind={async () => findRecipe({ id: x.id, title: x.title, table: 'sides' }, await authHeaders())} />
             ))}
           </div>
         )
@@ -324,7 +343,7 @@ export function MealPlanTab() {
                 {boxes > 0 && <span className="tag batch">Storkok, {boxes} {boxes === 1 ? 'matlåda' : 'matlådor'}</span>}
                 {d.minutes !== null && <span className="tag num">{d.minutes} min</span>}
                 {d.url && <span className="tag">{d.site}</span>}
-                {d.url && <span className={`tag ${lacking ? 'warn' : 'ok'}`}>{lacking ? `${lacking} saknas` : 'Allt hemma'}</span>}
+                {d.url && !d.eaten && <span className={`tag ${lacking ? 'warn' : 'ok'}`}>{lacking ? `${lacking} saknas` : 'Allt hemma'}</span>}
                 <RateButtons dish={d} ratings={ratings} />
               </div>
               {!d.url && !finding.has(d.id) && (
@@ -340,6 +359,7 @@ export function MealPlanTab() {
                 {d.url && <button type="button" className="btn" aria-expanded={open} onClick={() => setOpenIng((s) => { const n = new Set(s); if (open) n.delete(d.id); else n.add(d.id); return n })}>
                   Ingredienser <span className="num">{d.ingredients.length}</span> <svg className={`caret${open ? ' up' : ''}`} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
                 </button>}
+                <button type="button" className={`btn${d.eaten ? ' is-done' : ''}`} aria-pressed={Boolean(d.eaten)} onClick={() => ate({ table: 'mealPlan', id: d.id, title: d.title, eaten: d.eaten, ingredients: d.ingredients })}>{d.eaten ? '✓ Uppäten' : 'Jag åt detta'}</button>
               </div>
               {open && d.url && (
                 <div className="dinner-ingredients">
@@ -353,7 +373,19 @@ export function MealPlanTab() {
           </section>
         )
       })}
-      <PastDinners plan={plan} today={today} ratings={ratings} />
+      <PastDinners plan={plan} today={today} ratings={ratings} onAte={(d) => ate({ table: 'mealPlan', id: d.id, title: d.title, eaten: d.eaten, ingredients: d.ingredients })} />
+      {eating && (
+        <ConsumeDialog
+          title={eating.target.title}
+          used={eating.used}
+          onClose={() => setEating(null)}
+          onConfirm={async (changes) => {
+            const t = eating.target
+            setEating(null)
+            await undoable(`${t.title} är uppäten och lagret är uppdaterat`, ['pantry', t.table], () => markEaten(t, changes))
+          }}
+        />
+      )}
     </>
   )
 }
@@ -378,7 +410,7 @@ function RateButtons({ dish, ratings }: { dish: { title: string; date?: string; 
 }
 
 /** De senaste sju dagarnas middagar, så att man kan säga vad man tyckte. */
-function PastDinners({ plan, today, ratings }: { plan: PlannedDinner[]; today: string; ratings: DishRating[] }) {
+function PastDinners({ plan, today, ratings, onAte }: { plan: PlannedDinner[]; today: string; ratings: DishRating[]; onAte: (d: PlannedDinner) => void }) {
   const past = plan.filter((d) => d.date < today && d.date >= addDays(today, -7)).sort((a, b) => b.date.localeCompare(a.date))
   if (past.length === 0) return null
   const unrated = past.filter((d) => !ratings.some((r) => r.id === dishId(d.title))).length
@@ -392,6 +424,7 @@ function PastDinners({ plan, today, ratings }: { plan: PlannedDinner[]; today: s
             <div className="past-body">
               <div className="sub">{dayLabel(d.date)}</div>
               <div className="past-title">{d.url ? <a href={httpsUrl(d.url)} target="_blank" rel="noreferrer">{d.title}</a> : d.title}</div>
+              <button type="button" className={`side-link${d.eaten ? ' is-done' : ''}`} aria-pressed={Boolean(d.eaten)} onClick={() => onAte(d)}>{d.eaten ? '✓ Uppäten' : 'Jag åt detta'}</button>
             </div>
             <RateButtons dish={d} ratings={ratings} />
           </div>
@@ -413,7 +446,7 @@ function DateBadge({ date, today }: { date: string; today: string }) {
 const SLOT_LABEL = { breakfast: 'Frukost', lunch: 'Lunch' } as const
 
 /** Frukost eller lunch under dagens middag. En matlåda visar storkokets rätt. */
-function SideRow({ side, dinners, pantry, expiring, finding, notFound, onFind }: { side: PlannedSide; dinners: PlannedDinner[]; pantry: PantryItem[]; expiring: Set<string>; finding: boolean; notFound: boolean; onFind: () => void }) {
+function SideRow({ side, dinners, pantry, expiring, finding, notFound, onFind, onAte }: { side: PlannedSide; dinners: PlannedDinner[]; pantry: PantryItem[]; expiring: Set<string>; finding: boolean; notFound: boolean; onFind: () => void; onAte: () => void }) {
   const [open, setOpen] = useState(false)
   const from = side.fromBatch ? dinners.find((d) => d.date === side.fromBatch) : undefined
   const title = side.fromBatch ? `Matlåda: ${from?.title ?? side.title}` : side.title
@@ -434,6 +467,7 @@ function SideRow({ side, dinners, pantry, expiring, finding, notFound, onFind }:
         {meta && <div className={`side-meta${lacking && !side.fromBatch && !needsRecipe ? ' warn' : ''}`}>{meta}</div>}
         {side.url && <a className="side-link" href={httpsUrl(side.url)} target="_blank" rel="noreferrer">Öppna receptet</a>}
         {needsRecipe && !finding && <button type="button" className="side-link" onClick={onFind}>{notFound ? 'Försök igen' : 'Hitta recept'}</button>}
+        <button type="button" className={`side-link${side.eaten ? ' is-done' : ''}`} aria-pressed={Boolean(side.eaten)} onClick={onAte}>{side.eaten ? '✓ Uppäten' : 'Jag åt detta'}</button>
         {open && (
           <div className="dinner-ingredients">
             <IngredientList items={ingredients} expiring={expiring} />

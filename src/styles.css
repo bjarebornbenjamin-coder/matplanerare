@@ -669,3 +669,15 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 
 .list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
 .list-head p { margin: 0; }
+
+/* "Jag åt detta" */
+.btn.is-done, .side-link.is-done { color: #137333; }
+.btn.is-done { border-color: currentColor; }
+:root[data-theme='dark'] .btn.is-done, :root[data-theme='dark'] .side-link.is-done { color: #81c995; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .btn.is-done, :root:not([data-theme='light']) .side-link.is-done { color: #81c995; } }
+.side-link + .side-link { margin-left: 16px; }
+.consume-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--outline); cursor: pointer; }
+.consume-row:last-of-type { border-bottom: 0; }
+.consume-row input { width: 22px; height: 22px; margin-top: 2px; flex: none; accent-color: var(--primary); }
+.consume-row .title { display: block; font-weight: 500; }
+.consume-row .sub { display: block; }

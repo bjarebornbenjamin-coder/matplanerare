@@ -1,5 +1,6 @@
 import { addDays } from '../domain/dates'
 import { foodKey } from '../domain/food'
+import { tidyAmount } from '../domain/shoppingName'
 import type { ISODate, PantryItem, ShoppingItem } from '../domain/types'
 import { AiError } from './errors'
 import { callVision } from './vision'
@@ -20,7 +21,7 @@ export const RECEIPT_PROMPT = [
   'Format: {"items":[{"name":"Mjölk","amount":"1 l","shelf_life_days":7}]}',
   'Ta bara med mat och dryck. Hoppa över pant, bärkassar, rabatter, summor, moms, betalinformation, presentkort och icke-livsmedel som städ och hygien.',
   'Skriv ut butikens förkortningar som vanliga svenska namn utan märke och storlek i namnet, t.ex. "KAFFE ZOEGAS 450G" blir name "Kaffe", amount "450 g"; "LÄTTMJ 1,5%" blir "Lättmjölk".',
-  'amount: mängd eller vikt endast om den syns (t.ex. "2 st", "450 g"), annars tom sträng. Samma vara flera gånger: slå ihop och skriv antalet.',
+  'amount: mängd eller vikt endast om den syns (t.ex. "2 st", "450 g", "1 l"), annars tom sträng. Vikt för ost, kött och pålägg, volym för dryck; aldrig "bit" eller "bitar". Samma vara flera gånger: slå ihop och skriv antalet.',
   'shelf_life_days: din uppskattning av hur många dagar varan typiskt håller sig från inköp, ouppäten och rätt förvarad (färsk fisk 2, mjölk 7, ägg 28, bröd 5, torrvaror 365). null om du är osäker.',
   'Hitta inte på varor som inte syns. Ta inte med kortnummer, namn eller annan personlig information.',
 ].join('\n')
@@ -29,7 +30,7 @@ export const FRIDGE_PROMPT = [
   'Du tittar på ett foto av ett kylskåp, en frys eller ett skafferi och listar de matvaror du tydligt kan identifiera. Svara ENDAST med JSON, ingen annan text.',
   'Format: {"items":[{"name":"Mjölk","amount":"1 förpackning"}]}',
   'Ta bara med varor du är rimligt säker på. Gissa inte på det som är skymt eller oläsligt. Använd vanliga svenska namn.',
-  'amount: ungefärlig mängd (t.ex. "2 st", "halv förpackning"), tom sträng om du är osäker. Slå ihop identiska varor.',
+  'amount: ungefärlig mängd (t.ex. "2 st", "halv förpackning", "1 l"), tom sträng om du är osäker. Skriv aldrig "bit" eller "bitar" (t.ex. för ost eller juice): använd förpackning, vikt eller volym, eller lämna tomt. Slå ihop identiska varor.',
 ].join('\n')
 
 const MAX_ITEMS = 100
@@ -53,7 +54,7 @@ export function parseScanResponse(text: string, kind: ScanKind, today: ISODate):
     const name = typeof r.name === 'string' ? r.name.trim().replace(/\s+/g, ' ') : ''
     if (!name || name.length > 60 || seen.has(foodKey(name)) || rows.length >= MAX_ITEMS) return void skipped++
     seen.add(foodKey(name))
-    const amount = typeof r.amount === 'string' ? r.amount.trim().slice(0, 30) : ''
+    const amount = typeof r.amount === 'string' ? tidyAmount(r.amount.trim().slice(0, 30)) : ''
     const days = r.shelf_life_days
     const expires = kind === 'receipt' && typeof days === 'number' && Number.isInteger(days) && days >= 0 && days <= 730 ? addDays(today, days) : ''
     rows.push({ key: `r${i}`, name, amount, expires, include: true })

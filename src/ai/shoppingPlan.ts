@@ -1,5 +1,5 @@
 import { foodKey } from '../domain/food'
-import { cleanName } from '../domain/shoppingName'
+import { cleanName, tidyAmount } from '../domain/shoppingName'
 import type { PantryItem, ShoppingItem } from '../domain/types'
 import { AiError, describeError } from './errors'
 
@@ -23,6 +23,7 @@ export const SHOPPING_PROMPT = [
   '1. Slå ihop samma vara även när den heter olika ("gul lök" och "lök, hackad"; "frysta franska örter" och "franska örter"; "potatis, gärna fast" och "potatis"). Skilj på varor som är olika i butiken (rödlök och gul lök, crème fraiche och gräddfil, matlagningsgrädde och vispgrädde).',
   '2. Räkna ihop den totala mängden för hela veckan, så att en större förpackning kan räcka till flera rätter. Dra av det som finns hemma i pantry. Ta inte med det som redan räcker hemma.',
   '3. Avrunda uppåt till det man faktiskt kan köpa, i vanliga förpackningsstorlekar: t.ex. potatis 1 eller 2 kg påse, morötter 1 kg, gul lök styck eller 1 kg nät, grädde 2, 3 eller 5 dl, krossade tomater 400 g burk, pasta 500 g eller 1 kg, ris 1 kg, ägg 6, 12 eller 15 st, mjölk 1 eller 1,5 l, kycklingfilé cirka 700–1000 g. Skriv det som ska köpas, t.ex. "2 kg", "2 burkar à 400 g", "1 paket (5 dl)", "6 st".',
+  'Enheter: vikt (g, kg) för sådant som säljs i vikt, som ost, kött, fisk, pålägg och grönsaker i lösvikt; volym (dl, l) för dryck och flytande, som mjölk, juice och grädde; styck (st) bara för det som säljs styckvis, som ägg, citroner, burkar och paket. Skriv ALDRIG "bit", "bitar", "del" eller "lite" som mängd. Vet du inte mängden: lämna amount tom.',
   '4. Namn: kort, som det heter i butiken, stor bokstav först, utan tillstånd eller tillagning (inte "frysta", "hackad", "riven", "färsk", inte mängder i namnet). Exempel: "Franska örter", inte "frysta franska örter 3 g".',
   '5. Kryddor, torkade och frysta örter och annat som går åt i små mängder: utan mängd (en förpackning räcker). Hoppa helt över salt, peppar, matolja, olivolja, vatten och socker.',
   '6. Varje vara i current ska finnas kvar: slå ihop dubbletter och rensa namnen, men ta aldrig bort något och minska aldrig en mängd som användaren skrivit.',
@@ -69,7 +70,7 @@ export function parseShopping(text: string, current: ShoppingInput['current']): 
     const o = (r ?? {}) as Record<string, unknown>
     const name = cleanName(str(o.name, 60))
     if (!name || out.some((x) => foodKey(x.name) === foodKey(name))) continue
-    const amount = str(o.amount, 40)
+    const amount = tidyAmount(str(o.amount, 40))
     const note = str(o.note, 120)
     out.push({ name, ...(amount ? { amount } : {}), ...(note ? { note } : {}) })
   }

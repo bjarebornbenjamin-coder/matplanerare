@@ -50,11 +50,20 @@ export function cleanName(raw: string): string {
 }
 
 /**
+ * Vaga mängder säger inget om hur mycket som ska köpas eller finns hemma: "1 bit" ost,
+ * "2 bitar", "lite", "en del", "några". Då är det bättre att inte visa någon mängd alls.
+ */
+export function tidyAmount(amount: string | undefined): string {
+  const a = (amount ?? '').trim()
+  return /(^|[\s\d])(bit|bitar|bitars|del|delar|lite|litet|några|något|nån|skvätt|klick)(\b|$)/i.test(a) ? '' : a
+}
+
+/**
  * Små mängder (kryddor, örter, en msk av något) köper man som en hel förpackning: då är
  * mängden bara i vägen på listan. "3 g", "1 krm", "2 tsk", "1 msk", "en nypa" → ingen mängd.
  */
 export function shoppingAmount(amount: string | undefined): string | undefined {
-  const a = (amount ?? '').trim()
+  const a = tidyAmount(amount)
   if (!a) return undefined
   if (/\b(krm|tsk|msk|nypa|nypor|kvist|kvistar|blad)\b/i.test(a)) return undefined
   const g = /^(\d+(?:[.,]\d+)?)\s*g\b/i.exec(a)

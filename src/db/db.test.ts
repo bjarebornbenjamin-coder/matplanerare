@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { parseBackup } from './backup'
 import { db } from './db'
-import { rateDish, replaceOpenShopping, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
+import { markEaten, rateDish, replaceOpenShopping, addPantryItems, addShoppingItems, addWater, clearBought, exportAll, getSettings, importAll, moveBoughtToPantry, runOut, saveSettings } from './repo'
 
 beforeEach(async () => {
   await Promise.all([db.settings.clear(), db.aiConfig.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
@@ -122,5 +122,29 @@ describe('replaceOpenShopping', () => {
     expect(all.find((i) => i.name === 'Franska örter')).toMatchObject({ addedAt: '2026-11-11', done: false })
     expect(all.find((i) => i.id === 'b')).toBeUndefined()
     expect(all.find((i) => i.id === 'c')).toMatchObject({ name: 'Mjölk', done: true })
+  })
+})
+
+describe('jag åt detta', () => {
+  it('drar av från lagret och markerar rätten som uppäten, och följer med i säkerhetskopian', async () => {
+    await Promise.all([db.pantry.clear(), db.mealPlan.clear(), db.sides.clear()])
+    await db.pantry.bulkPut([
+      { id: 'k', name: 'Kycklingfilé', amount: '600 g', addedAt: '2026-11-01', source: 'manual', updatedAt: '' },
+      { id: 'g', name: 'Grädde', amount: '2 dl', addedAt: '2026-11-01', source: 'manual', updatedAt: '' },
+      { id: 'r', name: 'Ris', amount: '1 kg', addedAt: '2026-11-01', source: 'manual', updatedAt: '' },
+    ])
+    await db.mealPlan.put({ id: '2026-11-12', date: '2026-11-12', title: 'Kycklinggryta', reason: '', portions: 2, minutes: 30, ingredients: [], steps: [], updatedAt: '' })
+    await db.sides.put({ id: '2026-11-12:lunch', date: '2026-11-12', slot: 'lunch', title: 'Pasta', portions: 1, minutes: null, ingredients: [], updatedAt: '' })
+    await markEaten({ table: 'mealPlan', id: '2026-11-12' }, [{ id: 'k', amount: '200 g' }, { id: 'g', remove: true }])
+    expect((await db.pantry.get('k'))?.amount).toBe('200 g')
+    expect(await db.pantry.get('g')).toBeUndefined()
+    expect((await db.pantry.get('r'))?.amount).toBe('1 kg')
+    expect((await db.mealPlan.get('2026-11-12'))?.eaten).toBe(true)
+    await markEaten({ table: 'sides', id: '2026-11-12:lunch' }, [])
+    const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
+    expect(backup.mealPlan[0].eaten).toBe(true)
+    expect(backup.sides[0].eaten).toBe(true)
+    await markEaten({ table: 'mealPlan', id: '2026-11-12' }, [], false)
+    expect((await db.mealPlan.get('2026-11-12'))?.eaten).toBe(false)
   })
 })

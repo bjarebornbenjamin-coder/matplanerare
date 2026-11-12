@@ -92,6 +92,8 @@ export interface PlannedSide {
   /** Riktigt recept från nätet; då är ingredienserna receptsidans. */
   url?: string
   site?: string
+  /** Markerad med "Jag åt detta": ingredienserna är avdragna från lagret. */
+  eaten?: boolean
   updatedAt: string
 }
 
@@ -123,6 +125,8 @@ export interface PlannedDinner {
   /** Riktigt recept från nätet; då är ingredienserna receptsidans. */
   url?: string
   site?: string
+  /** Markerad med "Jag åt detta": ingredienserna är avdragna från lagret. */
+  eaten?: boolean
   updatedAt: string
 }
 

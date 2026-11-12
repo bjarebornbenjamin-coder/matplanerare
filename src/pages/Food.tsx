@@ -6,6 +6,7 @@ import { authHeaders } from '../lib/auth'
 import { PantryForm } from '../components/PantryForm'
 import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, replaceOpenShopping, runOut, saveShoppingItem } from '../db/repo'
 import { toISODate } from '../domain/dates'
+import { tidyAmount } from '../domain/shoppingName'
 import { expiryLabel, expiryStatus, expiringWithin, sortPantry } from '../domain/food'
 import type { PantryItem } from '../domain/types'
 import { useAiConfig, useFieldError, useNow, usePantry, useShopping } from '../hooks'
@@ -56,7 +57,7 @@ export function PantryTab() {
         return (
           <div key={i.id} className="card task">
             <button type="button" className="task-main" onClick={() => setEditing(i)}>
-              <span className="title">{i.name}{i.amount ? ` · ${i.amount}` : ''}</span>
+              <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
               {i.expires && <span className={`sub${status === 'expired' || status === 'today' || status === 'soon' ? ' overdue' : ''}`}>{expiryLabel(i.expires, today)}</span>}
             </button>
             <button type="button" className="btn" aria-label={`Slut: ${i.name}`} onClick={() => setRunningOut(i)}>Slut</button>
@@ -119,7 +120,7 @@ export function ShoppingTab() {
     <div key={i.id} className={`card task${i.done ? ' done' : ''}`}>
       <input type="checkbox" aria-label={`Köpt: ${i.name}`} checked={i.done} onChange={(e) => saveShoppingItem({ ...i, done: e.target.checked })} />
       <div className="task-main" style={{ cursor: 'default' }}>
-        <span className="title">{i.name}{i.amount ? ` · ${i.amount}` : ''}</span>
+        <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
         {i.note && <span className="sub">{i.note}</span>}
       </div>
       <button type="button" className="btn" aria-label={`Ta bort ${i.name}`} onClick={() => undoable(`${i.name} är borttagen från listan`, ['shopping'], () => deleteShoppingItem(i.id))}>Ta bort</button>

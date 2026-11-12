@@ -266,3 +266,26 @@ export async function rateDish(dish: { title: string; date?: string; url?: strin
     updatedAt: new Date().toISOString(),
   })
 }
+
+export interface PantryChange {
+  id: string
+  /** Ny mängd, eller remove när varan tagit slut. */
+  amount?: string
+  remove?: boolean
+}
+
+/**
+ * "Jag åt detta": drar av det som gått åt ur lagret och markerar rätten som uppäten.
+ * Körs i en transaktion så att lagret och menyn alltid hänger ihop.
+ */
+export async function markEaten(target: { table: 'mealPlan' | 'sides'; id: string }, changes: PantryChange[], eaten = true): Promise<void> {
+  const stamp = new Date().toISOString()
+  await db.transaction('rw', db.pantry, db.mealPlan, db.sides, async () => {
+    for (const c of changes) {
+      if (c.remove) await db.pantry.delete(c.id)
+      else if (c.amount) await db.pantry.update(c.id, { amount: c.amount, updatedAt: stamp })
+    }
+    if (target.table === 'mealPlan') await db.mealPlan.update(target.id, { eaten, updatedAt: stamp })
+    else await db.sides.update(target.id, { eaten, updatedAt: stamp })
+  })
+}

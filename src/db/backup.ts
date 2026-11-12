@@ -98,6 +98,7 @@ function parseDinner(v: unknown): PlannedDinner {
     steps,
     ...(num(v.boxes, 1, 30) !== undefined ? { boxes: Math.round(v.boxes as number) } : {}),
     ...(isStr(v.url) && v.url.startsWith('https://') ? { url: v.url.slice(0, 500), ...(isStr(v.site) ? { site: v.site.slice(0, 60) } : {}) } : {}),
+    ...(v.eaten === true ? { eaten: true } : {}),
     updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
   }
 }
@@ -116,6 +117,7 @@ function parseSide(v: unknown): PlannedSide {
     ingredients,
     ...(isDate(v.fromBatch) ? { fromBatch: v.fromBatch as string } : {}),
     ...(isStr(v.url) && v.url.startsWith('https://') ? { url: v.url.slice(0, 500), ...(isStr(v.site) ? { site: v.site.slice(0, 60) } : {}) } : {}),
+    ...(v.eaten === true ? { eaten: true } : {}),
     updatedAt: isStr(v.updatedAt) ? v.updatedAt : new Date().toISOString(),
   }
 }

@@ -263,7 +263,7 @@ function MemorySection() {
           setFact('')
         }}
       >
-        <input type="text" aria-label="Något att komma ihåg" placeholder="t.ex. Jag tränar helst på morgonen" value={fact} onChange={(e) => setFact(e.target.value)} />
+        <input type="text" aria-label="Något att komma ihåg" placeholder="t.ex. Jag gillar inte svamp" value={fact} onChange={(e) => setFact(e.target.value)} />
         <button type="submit" className="btn">Lägg till</button>
       </form>
     </>

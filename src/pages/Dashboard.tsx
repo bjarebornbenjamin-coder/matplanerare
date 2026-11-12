@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { addWater } from '../db/repo'
 import { httpsUrl } from '../domain/recipeLink'
 import { withPantryStatus } from '../ai/recipes'
-import { WEEKDAYS_SHORT, addDays, parseISODate, toISODate, weekdayOf } from '../domain/dates'
+import { WEEKDAYS_SHORT, addDays, parseISODate, toISODate, weekdayOf, daysBetween } from '../domain/dates'
 import { expiringWithin } from '../domain/food'
 import { useMealPlan, useNow, usePantry, useSettings, useShopping, useWater } from '../hooks'
 
@@ -40,7 +40,10 @@ export function Dashboard() {
   const lacking = tonight ? withPantryStatus(tonight.ingredients, pantry).filter((i) => i.status === 'missing').length : 0
   const expiring = expiringWithin(pantry, today)
   const toBuy = shopping.filter((i) => !i.done).length
-  const week = Array.from({ length: 7 }, (_, i) => addDays(today, i))
+  // Remsan följer menyns längd: en meny för 3 dagar visar 3 dagar, inte en hel vecka med tomma rutor.
+  const lastPlanned = plan.filter((d) => d.date >= today).map((d) => d.date).sort().pop()
+  const span = lastPlanned ? Math.min(14, daysBetween(today, lastPlanned) + 1) : 0
+  const week = Array.from({ length: span }, (_, i) => addDays(today, i))
 
   return (
     <div className="dash">
@@ -51,7 +54,7 @@ export function Dashboard() {
             <div className="tonight-title">{tonight.title}</div>
             <div className="tonight-meta">
               {tonight.minutes !== null && <span>{tonight.minutes} min</span>}
-              {tonight.url ? <span>{lacking ? `${lacking} saknas` : 'Allt finns hemma'}</span> : <span>Receptet saknas</span>}
+              {tonight.eaten ? <span>✓ Uppäten</span> : tonight.url ? <span>{lacking ? `${lacking} saknas` : 'Allt finns hemma'}</span> : <span>Receptet saknas</span>}
             </div>
             <div className="tonight-actions">
               {tonight.url ? (
@@ -100,8 +103,8 @@ export function Dashboard() {
         </Link>
       </div>
 
-      <section aria-label="Veckan">
-        <h2>Veckan</h2>
+      {week.length > 0 && <section aria-label="Kommande middagar">
+        <h2>Kommande middagar</h2>
         <ol className="week-strip">
           {week.map((date) => {
             const d = plan.find((x) => x.date === date)
@@ -117,7 +120,7 @@ export function Dashboard() {
             )
           })}
         </ol>
-      </section>
+      </section>}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanName, shoppingAmount } from './shoppingName'
+import { cleanName, shoppingAmount, tidyAmount } from './shoppingName'
 
 describe('namn på inköpslistan', () => {
   it('tar bort tillstånd, tillagning och tillägg', () => {
@@ -25,5 +25,10 @@ describe('namn på inköpslistan', () => {
     expect(shoppingAmount('500 g')).toBe('500 g')
     expect(shoppingAmount('2 dl')).toBe('2 dl')
     expect(shoppingAmount('')).toBeUndefined()
+  })
+  it('vaga mängder som "1 bit" tas bort, riktiga enheter behålls', () => {
+    for (const vague of ['1 bit', '2 bitar', 'en bit', 'lite', 'en del', 'några']) expect([vague, tidyAmount(vague)]).toEqual([vague, ''])
+    for (const ok of ['500 g', '1 l', '2 st', 'halv förpackning', '1 paket (5 dl)', '']) expect(tidyAmount(ok)).toBe(ok)
+    expect(shoppingAmount('1 bit')).toBeUndefined()
   })
 })
