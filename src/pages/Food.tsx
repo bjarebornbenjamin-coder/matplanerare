@@ -136,6 +136,18 @@ export function ShoppingTab() {
       </form>
       {error && <p className="error" role="alert">{error}</p>}
 
+      {open.length > 0 && (
+        <Link to="/handla" className="shop-start">
+          <span className="shop-start-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 9h14l-1.4 9.2a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8zM9 9l3-5 3 5" /></svg>
+          </span>
+          <span className="shop-start-text">
+            <strong>Börja handla</strong>
+            <span>Stora rader, sorterade efter butikens avdelningar</span>
+          </span>
+          <span className="chev" aria-hidden="true">›</span>
+        </Link>
+      )}
       <div className="list-head">
         <p className="muted">{open.length === 0 ? 'Inköpslistan är tom.' : `${open.length} att köpa`}</p>
         {open.length > 1 && <button type="button" className="btn text" disabled={tidying} onClick={tidy}>{tidying ? 'Städar…' : 'Städa listan'}</button>}
