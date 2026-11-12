@@ -8,7 +8,6 @@ import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
 import { addShoppingItems, dishId, getSettings, markEaten, rateDish, replaceOpenShopping, saveSettings } from '../db/repo'
 import { ConsumeDialog } from '../components/ConsumeDialog'
-import { DishPhoto } from '../components/DishPhoto'
 import { CookingOverlay, type CookRow } from '../components/CookingOverlay'
 import { consumption, type Consumption } from '../domain/consume'
 import { planShopping } from '../ai/shoppingPlan'
@@ -106,8 +105,7 @@ export function MealPlanTab() {
         ...(r.minutes ? { minutes: r.minutes } : {}),
         updatedAt: new Date().toISOString(),
       }
-      // Bilden hör till receptet: ett nytt recept utan bild ska inte behålla den gamla.
-      if (item.table === 'mealPlan') await db.mealPlan.update(item.id, { ...patch, steps: [], image: httpsUrl(r.image) })
+      if (item.table === 'mealPlan') await db.mealPlan.update(item.id, { ...patch, steps: [] })
       else await db.sides.update(item.id, patch)
       setNotFound((n) => { const x = new Set(n); x.delete(item.id); return x })
     } finally {
@@ -245,7 +243,6 @@ export function MealPlanTab() {
       day: parseISODate(date).getDate(),
       dinner: chosen ? (d?.title ?? 'Ingen rätt den här gången') : undefined,
       ready: Boolean(d?.url),
-      ...(d?.image ? { image: d.image } : {}),
       ...(extras ? { extras } : {}),
     }
   })
@@ -384,7 +381,6 @@ export function MealPlanTab() {
         const open = openIng.has(d.id)
         return (
           <section key={d.id} id={`middag-${d.date}`} className={`dinner${d.date === today ? ' is-today' : ''}${serve.className}`} style={serve.style} aria-label={`${dayLabel(d.date)}: ${d.title}`}>
-            {d.image && <DishPhoto key={d.image} src={d.image} className="dinner-photo" />}
             <div className="dinner-head">
               <DateBadge date={d.date} today={today} />
               <div className="dinner-headline">

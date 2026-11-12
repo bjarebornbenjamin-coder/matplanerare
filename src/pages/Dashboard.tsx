@@ -1,6 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { DishPhoto } from '../components/DishPhoto'
 import { addWater } from '../db/repo'
 import { httpsUrl } from '../domain/recipeLink'
 import { withPantryStatus } from '../ai/recipes'
@@ -27,8 +26,6 @@ function Ring({ value, goal, color, children }: { value: number; goal: number; c
 }
 
 export function Dashboard() {
-  /** Sant när kvällens bild är laddad: då läggs en mörk toning bakom texten. */
-  const [heroPhoto, setHeroPhoto] = useState(false)
   const settings = useSettings()
   const plan = useMealPlan()
   const pantry = usePantry()
@@ -50,8 +47,7 @@ export function Dashboard() {
 
   return (
     <div className="dash">
-      <section className={`tonight${tonight ? '' : ' empty-tonight'}${tonight?.image && heroPhoto ? ' has-photo' : ''}`} aria-label="Ikväll">
-        {tonight?.image && <DishPhoto key={tonight.image} src={tonight.image} className="tonight-photo" onLoaded={setHeroPhoto} />}
+      <section className={`tonight${tonight ? '' : ' empty-tonight'}`} aria-label="Ikväll">
         <div className="tonight-kicker">Ikväll</div>
         {tonight ? (
           <>
@@ -116,7 +112,6 @@ export function Dashboard() {
             return (
               <li key={date} className={`${date === today ? 'is-today' : ''}${d ? '' : ' is-empty'}`}>
                 <a href={d ? `#middag-${date}` : '#planera'}>
-                  {d?.image && <DishPhoto src={d.image} className="ws-photo" />}
                   <span className="ws-day">{date === today ? 'Idag' : wd}</span>
                   <span className="ws-date num">{parseISODate(date).getDate()}</span>
                   <span className="ws-dish">{d ? d.title : '–'}</span>

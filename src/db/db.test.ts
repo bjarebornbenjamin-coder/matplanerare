@@ -13,7 +13,7 @@ describe('export och import', () => {
     await db.pantry.put({ id: 'p1', name: 'Mjölk', amount: '1 l', expires: '2026-11-12', addedAt: '2026-11-08', source: 'receipt', updatedAt: '' })
     await db.shopping.put({ id: 's1', name: 'Ägg', done: false, addedAt: '2026-11-08', updatedAt: '' })
     await addWater('2026-11-10', 500)
-    await db.mealPlan.put({ id: '2026-11-11', date: '2026-11-11', title: 'Pasta carbonara', reason: '', portions: 2, minutes: 25, ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: [], url: 'https://www.ica.se/recept/x/', site: 'ica.se', image: 'https://assets.icanet.se/x.jpg', updatedAt: '' })
+    await db.mealPlan.put({ id: '2026-11-11', date: '2026-11-11', title: 'Pasta carbonara', reason: '', portions: 2, minutes: 25, ingredients: [{ name: 'Pasta', amount: '200 g' }], steps: [], url: 'https://www.ica.se/recept/x/', site: 'ica.se', updatedAt: '' })
     await db.sides.put({ id: '2026-11-12:lunch', date: '2026-11-12', slot: 'lunch', title: 'Pasta carbonara', portions: 1, minutes: null, ingredients: [], fromBatch: '2026-11-11', updatedAt: '' })
     const backup = parseBackup(JSON.parse(JSON.stringify(await exportAll())))
     await Promise.all([db.settings.clear(), db.pantry.clear(), db.shopping.clear(), db.water.clear(), db.mealPlan.clear(), db.sides.clear(), db.ratings.clear()])
@@ -25,10 +25,7 @@ describe('export och import', () => {
     expect((await db.shopping.get('s1'))?.name).toBe('Ägg')
     expect((await db.water.get('2026-11-10'))?.ml).toBe(500)
     expect(await db.sides.get('2026-11-12:lunch')).toMatchObject({ slot: 'lunch', fromBatch: '2026-11-11' })
-    expect(await db.mealPlan.get('2026-11-11')).toMatchObject({ title: 'Pasta carbonara', url: 'https://www.ica.se/recept/x/', image: 'https://assets.icanet.se/x.jpg' })
-    // En bild som inte är https följer inte med vid import.
-    const unsafe = parseBackup({ app: 'matplanerare', version: 1, mealPlan: [{ id: '2026-11-11', date: '2026-11-11', title: 'X', image: 'javascript:alert(1)' }] })
-    expect(unsafe.mealPlan[0].image).toBeUndefined()
+    expect(await db.mealPlan.get('2026-11-11')).toMatchObject({ title: 'Pasta carbonara', url: 'https://www.ica.se/recept/x/' })
   })
   it('avvisar filer från andra appar och ogiltiga varor', () => {
     expect(() => parseBackup({ app: 'studieassistent', version: 8 })).toThrow(/Matplaneraren/)

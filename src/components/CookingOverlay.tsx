@@ -1,6 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { AiProgress } from './AiProgress'
-import { DishPhoto } from './DishPhoto'
 
 export interface CookRow {
   date: string
@@ -11,8 +10,6 @@ export interface CookRow {
   dinner?: string
   /** Receptet är hämtat. */
   ready?: boolean
-  /** Receptets bild, när den finns. */
-  image?: string
   /** Frukost och lunch för dagen, om sådana planeras. */
   extras?: string
 }
@@ -119,7 +116,6 @@ export function CookingOverlay({ stage, rows, progress, onHide, leaving }: Props
               ) : (
                 <span className="cook-skeleton" aria-label="Väljer rätt" />
               )}
-              {r.image && <DishPhoto src={r.image} className="cook-thumb" />}
               {r.ready && (
                 <svg className="cook-check" viewBox="0 0 24 24" aria-label="Receptet är hämtat">
                   <circle cx="12" cy="12" r="11" fill="#fff" />

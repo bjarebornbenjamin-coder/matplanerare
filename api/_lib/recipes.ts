@@ -136,13 +136,6 @@ function findRecipe(node: unknown, depth = 0): Record<string, unknown> | null {
   return findRecipe(o['@graph'], depth + 1) ?? findRecipe(o.mainEntity, depth + 1)
 }
 
-/** Receptets bild: en adress, ett ImageObject ({url}) eller en lista av någon av dem. */
-function imageUrl(img: unknown): string | undefined {
-  const one = Array.isArray(img) ? img[0] : img
-  const url = typeof one === 'string' ? one : one && typeof one === 'object' ? (one as { url?: unknown; contentUrl?: unknown }).url ?? (one as { contentUrl?: unknown }).contentUrl : undefined
-  return typeof url === 'string' ? url.trim().slice(0, 500) : undefined
-}
-
 /** Läser receptet ur sidans JSON-LD. null om sidan inte har något recept med ingredienser. */
 export function recipeFromHtml(html: string): Omit<FoundRecipe, 'url' | 'site' | 'why'> | null {
   for (const m of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
@@ -163,7 +156,8 @@ export function recipeFromHtml(html: string): Omit<FoundRecipe, 'url' | 'site' |
     if (!title || ingredients.length === 0) continue
     const y = r.recipeYield
     const servings = typeof y === 'string' || typeof y === 'number' ? decode(String(y)) : Array.isArray(y) && y.length ? decode(String(y[0])) : undefined
-    const image = imageUrl(r.image)
+    const img = r.image
+    const image = typeof img === 'string' ? img : Array.isArray(img) && typeof img[0] === 'string' ? img[0] : img && typeof img === 'object' && typeof (img as { url?: unknown }).url === 'string' ? (img as { url: string }).url : undefined
     const minutes = isoMinutes(r.totalTime) ?? isoMinutes(r.cookTime)
     return { title, ingredients, ...(servings ? { servings: servings.slice(0, 40) } : {}), ...(minutes ? { minutes } : {}), ...(image && image.startsWith('https://') ? { image } : {}) }
   }

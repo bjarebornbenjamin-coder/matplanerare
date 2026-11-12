@@ -847,37 +847,3 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 @media (prefers-reduced-motion: reduce) { .shop-item, .shop-ring-fill, .shop-name, .shop-check, .shop-check path { transition: none; } }
 @keyframes shop-in { from { opacity: 0; transform: translateY(5%); } to { opacity: 1; transform: none; } }
 @keyframes shop-leave { from { opacity: 1; max-height: 120px; transform: none; } to { opacity: 0; max-height: 0; margin-top: -8px; transform: translateX(48px); } }
-
-/* ===== Bilder på rätterna ===== */
-.photo { display: block; overflow: hidden; background: var(--surface-3, var(--surface-2)); }
-.photo img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 500ms ease; }
-.photo.is-loaded img { opacity: 1; }
-
-/* Ikväll: bilden fyller kortet, med mörk toning bakom texten. */
-.tonight-photo { position: absolute; inset: 0; background: none; }
-.tonight > :not(.tonight-photo) { position: relative; z-index: 1; }
-.tonight.has-photo { min-height: 260px; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28); }
-.tonight.has-photo::after { content: ''; position: absolute; inset: 0; width: auto; height: auto; right: 0; top: 0; border-radius: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.5) 42%, rgba(0, 0, 0, 0.84) 100%); z-index: 0; }
-.tonight.has-photo .tonight-kicker { text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); }
-.tonight.has-photo .tonight-title { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55); }
-.tonight.has-photo .tonight-meta span { background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-
-/* Kommande middagar: liten bild överst i varje ruta. */
-.ws-photo { width: 100%; height: 58px; border-radius: 10px; margin-bottom: 6px; }
-.week-strip li:has(.ws-photo) a { min-height: 170px; }
-
-/* Middagskorten: bilden går kant i kant överst. */
-.dinner-photo { margin: -16px -16px 14px; height: 168px; border-radius: 18px 18px 0 0; }
-@media (min-width: 560px) { .dinner-photo { height: 210px; } }
-
-/* Köket: en liten bild på raden när receptet är hämtat. */
-.cook-thumb { flex: none; width: 40px; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, 0.16); }
-
-@media (prefers-reduced-motion: no-preference) {
-  .tonight-photo.is-loaded img { animation: photo-drift 26s ease-in-out infinite alternate; }
-  .dinner-photo.is-loaded img { animation: photo-settle 900ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
-  .cook-thumb.is-loaded { animation: cook-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1) both; }
-}
-@media (prefers-reduced-motion: reduce) { .photo img { transition: none; } }
-@keyframes photo-drift { from { transform: scale(1.02); } to { transform: scale(1.14) translate(-2%, -2%); } }
-@keyframes photo-settle { from { transform: scale(1.08); } to { transform: scale(1); } }
