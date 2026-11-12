@@ -12,6 +12,7 @@ const DESCRIPTORS = [
   'rivna', 'riven', 'rivet', 'finrivet', 'finriven', 'strimlade', 'strimlad', 'tärnade', 'tärnad',
   'skivade', 'skivad', 'pressade', 'pressad', 'kokta', 'kokt', 'kalla', 'kall',
   'rumsvarma', 'rumsvarmt', 'rumsvarm', 'mjukt', 'mjuk', 'smält', 'smälta', 'skalade', 'skalad',
+  'ätmogna', 'ätmogen', 'ätmoget', 'mogna', 'mogen', 'moget',
   'urkärnade', 'urkärnad', 'avrunna', 'avrunnen', 'sköljda', 'nymalen', 'nymald', 'gärna', 'ca', 'ca.', 'cirka', 'ev', 'ev.', 'eventuellt', 'ekologisk', 'ekologiska',
 ]
 /** Sist i raden: "efter smak", "till servering" osv. */

@@ -6,7 +6,7 @@ import { addShoppingItems, clearBought, deleteShoppingItem, moveBoughtToPantry, 
 import { toISODate } from '../domain/dates'
 import { tidyAmount } from '../domain/shoppingName'
 import { SECTIONS, sectionFor } from '../domain/storeSection'
-import { tidyShopping, useShoppingTidy } from '../lib/shoppingTidy'
+import { mergeByHand, tidyShopping, useShoppingTidy } from '../lib/shoppingTidy'
 import { expiryLabel, expiryStatus, expiringWithin, sortPantry } from '../domain/food'
 import type { PantryItem } from '../domain/types'
 import { useFieldError, useNow, usePantry, useShopping } from '../hooks'
@@ -77,6 +77,10 @@ export function ShoppingTab() {
   const [message, setMessage] = useState('')
   const tidy = useShoppingTidy()
   const { error, fail, touch } = useFieldError()
+  /** Rader som valts för att slås ihop för hand. null = inte i det läget. */
+  const [picked, setPicked] = useState<Set<string> | null>(null)
+  /** Namnet den ihopslagna raden ska få, om användaren valt ett annat än förslaget. */
+  const [pickName, setPickName] = useState('')
 
   // AI:n går igenom listan när den öppnas, om det tillkommit varor sedan sist. En gång per
   // besök, så att Ångra inte genast görs om.
@@ -91,6 +95,9 @@ export function ShoppingTab() {
 
   const open = shopping.filter((i) => !i.done)
   // Samma ordning som i butiken: avdelning för avdelning, och i bokstavsordning inom varje.
+  // Namnen att välja mellan när rader slås ihop: det kortaste först ("Bananer" före "Ätmogna bananer").
+  const pickNames = [...new Set(open.filter((i) => picked?.has(i.id)).map((i) => i.name))].sort((a, b) => a.length - b.length)
+  const mergedName = pickNames.includes(pickName) ? pickName : (pickNames[0] ?? '')
   const groups = SECTIONS.map((section) => ({ section, items: open.filter((i) => sectionFor(i) === section).sort((a, b) => a.name.localeCompare(b.name, 'sv')) })).filter((g) => g.items.length > 0)
   const bought = shopping.filter((i) => i.done)
 
@@ -109,16 +116,42 @@ export function ShoppingTab() {
     setMessage(`${n} ${n === 1 ? 'vara' : 'varor'} lades i lagret.`)
   }
 
-  const row = (i: (typeof shopping)[number]) => (
-    <div key={i.id} className={`card task${i.done ? ' done' : ''}`}>
-      <input type="checkbox" aria-label={`Köpt: ${i.name}`} checked={i.done} onChange={(e) => saveShoppingItem({ ...i, done: e.target.checked })} />
-      <div className="task-main" style={{ cursor: 'default' }}>
-        <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
-        {i.note && <span className="sub">{i.note}</span>}
+  const togglePick = (id: string) =>
+    setPicked((p) => {
+      const n = new Set(p)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+
+  /** Slår ihop de valda raderna. Appen kommer ihåg paret till nästa gång. */
+  async function mergePicked() {
+    const name = await mergeByHand([...(picked ?? [])], mergedName)
+    setPicked(null)
+    setPickName('')
+    if (name) setMessage(`Appen kommer ihåg att de här varorna är ${name}.`)
+  }
+
+  const row = (i: (typeof shopping)[number]) =>
+    picked && !i.done ? (
+      // Läget "slå ihop": hela raden väljs, och den kan varken bockas av eller tas bort av misstag.
+      <label key={i.id} className={`card task pick${picked.has(i.id) ? ' is-picked' : ''}`}>
+        <input type="checkbox" aria-label={`Välj ${i.name}`} checked={picked.has(i.id)} onChange={() => togglePick(i.id)} />
+        <div className="task-main" style={{ cursor: 'pointer' }}>
+          <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
+          {i.note && <span className="sub">{i.note}</span>}
+        </div>
+      </label>
+    ) : (
+      <div key={i.id} className={`card task${i.done ? ' done' : ''}`}>
+        <input type="checkbox" aria-label={`Köpt: ${i.name}`} checked={i.done} onChange={(e) => saveShoppingItem({ ...i, done: e.target.checked })} />
+        <div className="task-main" style={{ cursor: 'default' }}>
+          <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
+          {i.note && <span className="sub">{i.note}</span>}
+        </div>
+        <button type="button" className="btn" aria-label={`Ta bort ${i.name}`} onClick={() => undoable(`${i.name} är borttagen från listan`, ['shopping'], () => deleteShoppingItem(i.id))}>Ta bort</button>
       </div>
-      <button type="button" className="btn" aria-label={`Ta bort ${i.name}`} onClick={() => undoable(`${i.name} är borttagen från listan`, ['shopping'], () => deleteShoppingItem(i.id))}>Ta bort</button>
-    </div>
-  )
+    )
 
   return (
     <>
@@ -143,10 +176,36 @@ export function ShoppingTab() {
       )}
       <div className="list-head">
         <p className="muted">{open.length === 0 ? 'Inköpslistan är tom.' : `${open.length} att köpa`}</p>
-        {open.length > 1 && <button type="button" className="btn" disabled={tidy.running} onClick={() => tidyShopping({ force: true })}>{tidy.running ? 'Städar…' : 'Städa med AI'}</button>}
+        {open.length > 1 && !picked && (
+          <span className="list-actions">
+            <button type="button" className="btn text" disabled={tidy.running} onClick={() => setPicked(new Set())}>Slå ihop</button>
+            <button type="button" className="btn" disabled={tidy.running} onClick={() => tidyShopping({ force: true })}>{tidy.running ? 'Städar…' : 'Städa med AI'}</button>
+          </span>
+        )}
       </div>
-      <AiProgress active={tidy.running} expected={12} label="AI:n går igenom listan" />
-      {tidy.message && !tidy.running && <p className="muted" role="status">{tidy.message}</p>}
+      {picked && (
+        <div className="pick-bar" role="region" aria-label="Slå ihop varor">
+          {picked.size < 2 || !mergedName ? <p>Välj de rader som är samma vara.</p> : (
+            <label className="inline-field">
+              <span>{picked.size} rader blir</span>
+              <select value={mergedName} onChange={(e) => setPickName(e.target.value)}>
+                {pickNames.map((n) => <option key={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
+          <div className="actions" style={{ marginTop: 0 }}>
+            <button type="button" className="btn primary" disabled={picked.size < 2} onClick={mergePicked}>Slå ihop</button>
+            <button type="button" className="btn" onClick={() => { setPicked(null); setPickName('') }}>Avbryt</button>
+          </div>
+        </div>
+      )}
+      <AiProgress active={tidy.running} expected={20} label="AI:n går igenom listan" />
+      {tidy.message && !tidy.running && (
+        <div className="warning" role="alert">
+          <p>{tidy.message}</p>
+          <button type="button" className="btn" onClick={() => tidyShopping({ force: true })}>Försök igen</button>
+        </div>
+      )}
       {groups.map((g) => (
         <section key={g.section} aria-label={g.section}>
           <h2 className="list-section">{g.section}</h2>

@@ -28,6 +28,7 @@ function parseSettings(v: unknown): Settings {
     batchWeekdays: weekdays(f.batchWeekdays),
     boxPortions: typeof f.boxPortions === 'number' && f.boxPortions >= 1 && f.boxPortions <= 8 ? Math.round(f.boxPortions) : DEFAULT_FOOD.boxPortions,
     weekWishes: isStr(f.weekWishes) ? f.weekWishes.slice(0, 500) : '',
+    aliases: Object.fromEntries(Object.entries(isObj(f.aliases) ? f.aliases : {}).filter((e): e is [string, string] => isStr(e[1]) && e[0].length <= 60 && e[1].length <= 60).slice(0, 300)),
     shopping: {
       enabled: typeof sh.enabled === 'boolean' ? sh.enabled : DEFAULT_FOOD.shopping.enabled,
       weekday: typeof sh.weekday === 'number' && sh.weekday >= 1 && sh.weekday <= 7 ? sh.weekday : DEFAULT_FOOD.shopping.weekday,

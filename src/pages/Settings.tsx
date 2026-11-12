@@ -174,6 +174,35 @@ function BackgroundSection() {
   )
 }
 
+/** Varor som användaren slagit ihop på inköpslistan och som appen därför räknar som samma. */
+function AliasSection() {
+  const settings = useSettings()
+  if (!settings) return null
+  const aliases = Object.entries(settings.food.aliases ?? {}).sort((a, b) => a[1].localeCompare(b[1], 'sv') || a[0].localeCompare(b[0], 'sv'))
+  const forget = (key: string) => {
+    const next = { ...(settings.food.aliases ?? {}) }
+    delete next[key]
+    void saveSettings({ food: { ...settings.food, aliases: next } })
+  }
+  return (
+    <>
+      <p className="muted">När du slår ihop två rader på inköpslistan kommer appen ihåg att de är samma vara, och slår ihop dem av sig själv nästa gång. Ta bort ett par här om det blev fel.</p>
+      {aliases.length === 0 ? <p className="empty">Inget sparat än. Välj Slå ihop på inköpslistan.</p> : (
+        <div className="settings-list">
+          {aliases.map(([from, to]) => (
+            <div key={from} className="settings-row">
+              <span><span className="title">{from}</span><span className="sub">räknas som {to}</span></span>
+              <button type="button" className="icon-btn" aria-label={`Glöm att ${from} är ${to}`} onClick={() => forget(from)}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
 function RatingsSection() {
   const ratings = useRatings()
   if (!ratings) return null
@@ -295,6 +324,7 @@ export function SettingsPage() {
     ai: { title: 'AI-assistent', body: <AiSection /> },
     minne: { title: 'Preferenser', body: <MemorySection /> },
     betyg: { title: 'Betyg på rätter', body: <RatingsSection /> },
+    sammavara: { title: 'Samma vara', body: <AliasSection /> },
     sakerhetskopia: {
       title: 'Säkerhetskopia',
       body: (
@@ -341,6 +371,7 @@ export function SettingsPage() {
       title: 'AI',
       rows: [
         { to: 'ai', title: 'AI-assistent', status: `${config?.model ?? DEFAULT_MODEL}${config?.password ? ', lösenord sparat' : ''}` },
+        { to: 'sammavara', title: 'Samma vara', status: Object.keys(settings.food.aliases ?? {}).length ? `${Object.keys(settings.food.aliases ?? {}).length} ihopslagna par` : 'Inget sparat' },
         { to: 'betyg', title: 'Betyg på rätter', status: ratings?.length ? `${ratings.filter((r) => r.rating === 1).length} gillade, ${ratings.filter((r) => r.rating === -1).length} ogillade` : 'Inga än' },
         { to: 'minne', title: 'Preferenser', status: settings.memories.length ? `${settings.memories.length} ${settings.memories.length === 1 ? 'sak' : 'saker'}` : 'Inget sparat' },
       ],

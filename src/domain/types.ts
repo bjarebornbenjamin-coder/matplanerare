@@ -19,6 +19,8 @@ export interface FoodSettings {
   batchWeekdays: number[]
   /** Portioner per matlåda-lunch. */
   boxPortions: number
+  /** Varor användaren själv slagit ihop på inköpslistan, t.ex. { "bladspenat": "Spenat" }. */
+  aliases?: Record<string, string>
   /** Önskemål för veckan i fri text, t.ex. "fredag något lyxigt". Skickas med när menyn görs. */
   weekWishes?: string
   /** Notis med inköpslistan en viss veckodag (1 = måndag … 7 = söndag). */

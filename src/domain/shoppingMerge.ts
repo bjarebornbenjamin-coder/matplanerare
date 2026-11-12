@@ -1,4 +1,4 @@
-import { formatQty, listName, qty, sameShoppingItem } from './consume'
+import { formatQty, listName, qty, sameShoppingItem, type Aliases } from './consume'
 import { tidyAmount } from './shoppingName'
 
 /** En rad på inköpslistan, före eller efter ihopslagning. */
@@ -40,10 +40,10 @@ export function addAmounts(amounts: (string | undefined)[]): string | undefined 
  * ("hackad koriander" → "Koriander"); varor användaren skrivit själv (utan rätt) lämnas som de är
  * så länge de inte slås ihop med något. `merged` = hur många rader som försvann.
  */
-export function mergeShopping<T extends MergeLine>(items: T[]): { lines: MergeLine[]; merged: number; changed: boolean } {
+export function mergeShopping<T extends MergeLine>(items: T[], aliases?: Aliases): { lines: MergeLine[]; merged: number; changed: boolean } {
   const groups: T[][] = []
   for (const item of items) {
-    const group = groups.find((g) => sameShoppingItem(g[0].name, item.name))
+    const group = groups.find((g) => sameShoppingItem(g[0].name, item.name, aliases))
     if (group) group.push(item)
     else groups.push([item])
   }
@@ -53,7 +53,7 @@ export function mergeShopping<T extends MergeLine>(items: T[]): { lines: MergeLi
     const section = g.find((i) => i.section)?.section
     if (g.length === 1 && !fromRecipe) return { name: g[0].name, ...(g[0].amount ? { amount: g[0].amount } : {}), ...(g[0].note ? { note: g[0].note } : {}), ...(section ? { section } : {}) }
     // Det mest beskrivande namnet: "Gul lök" hellre än "Lök".
-    const name = g.map((i) => listName(i.name)).sort((a, b) => b.split(' ').length - a.split(' ').length || b.length - a.length)[0]
+    const name = g.map((i) => listName(i.name, aliases)).sort((a, b) => b.split(' ').length - a.split(' ').length || b.length - a.length)[0]
     const amount = addAmounts(g.map((i) => i.amount))
     const note = [...new Set(g.flatMap((i) => dishes(i.note)))].join(', ').slice(0, 120)
     const line = { name, ...(amount ? { amount } : {}), ...(note ? { note } : {}), ...(section ? { section } : {}) }
@@ -61,4 +61,27 @@ export function mergeShopping<T extends MergeLine>(items: T[]): { lines: MergeLi
     return line
   })
   return { lines, merged: items.length - lines.length, changed }
+}
+
+/**
+ * Slår ihop utpekade rader (nummer i listan, från noll): varje grupp blir en rad med angivet
+ * namn, summerad mängd och alla rätter. Används när AI:n eller användaren pekar ut dubbletter.
+ * Ogiltiga nummer och rader som redan ingår i en annan grupp hoppas över.
+ */
+export function mergeRows(lines: MergeLine[], groups: { rows: number[]; name?: string }[]): MergeLine[] {
+  const taken = new Set<number>()
+  const mergedAt = new Map<number, MergeLine>()
+  for (const g of groups) {
+    const rows = [...new Set(g.rows)].filter((r) => Number.isInteger(r) && r >= 0 && r < lines.length && !taken.has(r))
+    if (rows.length < 2) continue
+    rows.forEach((r) => taken.add(r))
+    const members = rows.map((r) => lines[r])
+    // Utan angivet namn: det kortaste, som brukar vara det allmänna ("Bananer" hellre än "Ätmogna bananer").
+    const name = g.name?.trim() || [...members].sort((a, b) => a.name.length - b.name.length)[0].name
+    const amount = addAmounts(members.map((m) => m.amount))
+    const note = [...new Set(members.flatMap((m) => dishes(m.note)))].join(', ').slice(0, 120)
+    const section = members.find((m) => m.section)?.section
+    mergedAt.set(Math.min(...rows), { name, ...(amount ? { amount } : {}), ...(note ? { note } : {}), ...(section ? { section } : {}) })
+  }
+  return lines.flatMap((line, i) => (mergedAt.has(i) ? [mergedAt.get(i)!] : taken.has(i) ? [] : [line]))
 }

@@ -841,3 +841,13 @@ h3.plan-sub { font-size: 13px; font-weight: 600; text-transform: uppercase; lett
 h2.list-section { margin: 14px 4px 6px; }
 .shop-tidying { padding: 8vh 4px 0; text-align: center; color: var(--muted); }
 .shop-tidying .ai-progress { max-width: 360px; margin: 16px auto 0; }
+
+/* Slå ihop rader för hand på inköpslistan */
+.list-actions { display: inline-flex; align-items: center; gap: 4px; }
+.pick-bar { position: sticky; top: 8px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 8px 0; padding: 12px 14px; border-radius: 16px; background: var(--primary-container); color: var(--on-primary-container); }
+.pick-bar p { margin: 0; font-weight: 500; }
+.pick-bar .inline-field { color: inherit; font-weight: 500; flex-wrap: wrap; }
+.pick-bar .inline-field select { max-width: 100%; }
+.card.task.pick { cursor: pointer; }
+.card.task.pick.is-picked { outline: 2px solid var(--primary); outline-offset: -2px; }
+.warning .btn { margin-top: 6px; }

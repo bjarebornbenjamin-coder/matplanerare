@@ -218,7 +218,7 @@ export function MealPlanTab() {
       const needs = withRecipe.flatMap((d) => d.ingredients.map((i) => ({ name: i.name, amount: i.amount, dish: d.title })))
       const current = (await db.shopping.toArray()).filter((i) => !i.done)
       try {
-        const lines = await planShopping({ needs, pantry: pantry!, current }, config?.model ?? 'gpt-4o-mini', await authHeaders())
+        const lines = await planShopping({ needs, pantry: pantry!, current, aliases: settings!.food.aliases }, config?.model ?? 'gpt-4o-mini', await authHeaders())
         await undoable('Inköpslistan är uppdaterad', ['shopping'], () => replaceOpenShopping(lines))
         rememberTidied(lines) // AI:n har redan gått igenom de här raderna
         setMessage(`Inköpslistan har ${lines.length} varor, sammanräknade för hela veckan.`)

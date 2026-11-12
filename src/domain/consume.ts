@@ -46,7 +46,7 @@ export function formatQty(value: number, unit: Unit): string {
 }
 
 /** Ord som inte ändrar vilken vara det är: "gul lök" är lök, "fast potatis" är potatis. */
-const NEUTRAL = new Set(['gul', 'gula', 'stor', 'stora', 'liten', 'små', 'fast', 'fasta', 'mjölig', 'mjöliga', 'mogen', 'mogna', 'hel', 'hela', 'svensk', 'svenska', 'vanlig', 'vanliga'])
+const NEUTRAL = new Set(['gul', 'gula', 'stor', 'stora', 'liten', 'små', 'fast', 'fasta', 'mjölig', 'mjöliga', 'mogen', 'mogna', 'ätmogen', 'ätmogna', 'ätmoget', 'hel', 'hela', 'svensk', 'svenska', 'vanlig', 'vanliga'])
 
 /** Vanliga varianter som räknas som samma vara i lagret. */
 const SAME: Record<string, string> = {
@@ -59,7 +59,7 @@ const SAME: Record<string, string> = {
 }
 
 /** Oregelbundna böjningar som inte fångas av ändelserna. */
-const FORMS: Record<string, string> = { morötter: 'morot', lökar: 'lök', ägg: 'ägg', tomater: 'tomat' }
+const FORMS: Record<string, string> = { morötter: 'morot', lökar: 'lök', ägg: 'ägg', tomater: 'tomat', bladspenat: 'spenat', babyspenat: 'spenat', färskspenat: 'spenat' }
 
 /** Varor som skrivs isär eller ihop: "röda lökar" och "röd lök" är rödlök. */
 const PHRASES: [RegExp, string][] = [
@@ -71,15 +71,23 @@ const PHRASES: [RegExp, string][] = [
 ]
 const phrase = (key: string) => PHRASES.find(([re]) => re.test(key))?.[1] ?? key
 
+/**
+ * Par som användaren själv slagit ihop på inköpslistan: nyckeln är varans namn (rensat, gemener)
+ * och värdet namnet den ska räknas som, t.ex. { "bladspenat": "Spenat" }.
+ */
+export type Aliases = Record<string, string>
+export const aliasKey = (name: string) => foodKey(cleanName(name))
+const resolve = (name: string, aliases?: Aliases) => aliases?.[aliasKey(name)] ?? name
+
 /** Namnet som det ska stå på listan: "röda lökar" → "Rödlök", "hackad gul lök" → "Gul lök". */
-export function listName(name: string): string {
-  const clean = cleanName(name)
+export function listName(name: string, aliases?: Aliases): string {
+  const clean = cleanName(resolve(name, aliases))
   const canon = phrase(foodKey(clean))
   return canon === foodKey(clean) ? clean : canon[0].toLocaleUpperCase('sv') + canon.slice(1)
 }
 
-const words = (s: string, variants = true) =>
-  phrase(foodKey(cleanName(s)))
+const words = (s: string, variants = true, aliases?: Aliases) =>
+  phrase(foodKey(cleanName(resolve(s, aliases))))
     .split(/[\s-]+/)
     .filter((w) => w && !NEUTRAL.has(w))
     .map((w) => FORMS[w] ?? (variants ? (SAME[w] ?? w) : w))
@@ -110,9 +118,9 @@ export function sameProduct(ingredient: string, pantryName: string): boolean {
  * Samma vara på inköpslistan: "hackad gul lök", "gul lök" och "Lök" är en och samma. Här räknas
  * däremot inte varianter som samma (vispgrädde och matlagningsgrädde är olika varor i butiken).
  */
-export function sameShoppingItem(a: string, b: string): boolean {
-  const x = words(a, false)
-  const y = words(b, false)
+export function sameShoppingItem(a: string, b: string, aliases?: Aliases): boolean {
+  const x = words(a, false, aliases)
+  const y = words(b, false, aliases)
   return x.length > 0 && x.length === y.length && x.every((w, i) => sameWord(w, y[i]))
 }
 
