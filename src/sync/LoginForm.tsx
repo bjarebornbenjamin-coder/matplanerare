@@ -1,4 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type CSSProperties, type FormEvent } from 'react'
+import { DEFAULT_FOOD } from '../db/repo'
+import { useSettings } from '../hooks'
+import { answerSummary } from '../domain/onboarding'
+import { reopenOnboarding, useOnboarding } from '../lib/onboarding'
 import { keyHint, projectHint, supabase } from './supabase'
 
 /** Supabase svarar på engelska; de vanligaste felen översätts. */
@@ -28,7 +32,8 @@ function EyeIcon({ open }: { open: boolean }) {
   )
 }
 
-export function LoginForm({ intro }: { intro?: string }) {
+/** `prefer` = knappen som står först och som Enter väljer: skapa konto för den som är ny, annars logga in. */
+export function LoginForm({ intro, prefer = 'in' }: { intro?: string; prefer?: 'in' | 'up' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
@@ -55,7 +60,7 @@ export function LoginForm({ intro }: { intro?: string }) {
   }
 
   return (
-    <form className="login-form" onSubmit={(e) => auth('in', e)}>
+    <form className="login-form" onSubmit={(e) => auth(prefer, e)}>
       {intro && <p className="muted">{intro}</p>}
       <label className="field">
         <span>E-post</span>
@@ -73,24 +78,48 @@ export function LoginForm({ intro }: { intro?: string }) {
       {message && <p className="error" role="alert">{message}</p>}
       {info && <p className="muted" role="status">{info}</p>}
       <div className="login-buttons">
-        <button type="submit" className="btn primary wide" disabled={busy !== null || !email || !password}>{busy === 'in' ? 'Loggar in…' : 'Logga in'}</button>
-        <button type="button" className="btn wide" disabled={busy !== null || !email || !password} onClick={() => auth('up')}>{busy === 'up' ? 'Skapar konto…' : 'Skapa konto'}</button>
+        {(prefer === 'up' ? (['up', 'in'] as const) : (['in', 'up'] as const)).map((kind, i) => (
+          <button key={kind} type={i === 0 ? 'submit' : 'button'} className={`btn wide${i === 0 ? ' primary' : ''}`} disabled={busy !== null || !email || !password} onClick={i === 0 ? undefined : () => auth(kind)}>
+            {kind === 'in' ? (busy === 'in' ? 'Loggar in…' : 'Logga in') : busy === 'up' ? 'Skapar konto…' : 'Skapa konto'}
+          </button>
+        ))}
       </div>
-      <p className="muted small">Första gången: skriv e-post och ett lösenord (minst 6 tecken) och tryck Skapa konto.</p>
+      <p className="muted small">{prefer === 'up' ? 'Skriv e-post och ett lösenord (minst 6 tecken) och tryck Skapa konto. Har du redan ett konto trycker du Logga in.' : 'Första gången: skriv e-post och ett lösenord (minst 6 tecken) och tryck Skapa konto.'}</p>
     </form>
   )
 }
 
-/** Första sidan när synken är installerad men ingen är inloggad. */
+/** Första sidan när synken är installerad men ingen är inloggad. Den som just svarat på frågorna ser sina val här. */
 export function LoginScreen() {
+  const { answers } = useOnboarding()
+  const settings = useSettings()
   return (
     <div className="login">
       <div className="eyebrow">Matplaneraren</div>
-      <h1>Välkommen</h1>
-      <p className="muted">Planera veckans mat, håll koll på det du har hemma och handla smart. Logga in en gång per enhet, så följer allt med mellan mobil och dator.</p>
+      {answers ? (
+        <>
+          <h1>Sista steget</h1>
+          <p className="muted">Skapa ett konto eller logga in, så sparas dina val och menyn följer med mellan mobil och dator.</p>
+          <div className="login-picks">
+            <div className="login-picks-head">
+              <span>Dina val</span>
+              <button type="button" className="btn text" onClick={reopenOnboarding}>Ändra</button>
+            </div>
+            <ul>
+              {answerSummary(answers, settings?.food.portions ?? DEFAULT_FOOD.portions).map((t, i) => <li key={t} style={{ '--i': i } as CSSProperties}>{t}</li>)}
+            </ul>
+          </div>
+        </>
+      ) : (
+        <>
+          <h1>Välkommen</h1>
+          <p className="muted">Planera veckans mat, håll koll på det du har hemma och handla smart. Logga in en gång per enhet, så följer allt med mellan mobil och dator.</p>
+        </>
+      )}
       <div className="card login-card">
-        <LoginForm />
+        <LoginForm prefer={answers ? 'up' : 'in'} />
       </div>
+      {!answers && <button type="button" className="btn text login-ask" onClick={reopenOnboarding}>Välj portioner, kost och allergier först</button>}
     </div>
   )
 }

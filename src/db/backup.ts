@@ -19,7 +19,7 @@ function parseSettings(v: unknown): Settings {
   const sh = isObj(f.shopping) ? f.shopping : {}
   const ex = isObj(f.expiry) ? f.expiry : {}
   const food = {
-    allergies: isStr(f.allergies) ? f.allergies.slice(0, 500) : DEFAULT_FOOD.allergies,
+    allergies: isStr(f.allergies) ? f.allergies.slice(0, 1000) : DEFAULT_FOOD.allergies,
     portions: typeof f.portions === 'number' && f.portions >= 1 && f.portions <= 12 ? Math.round(f.portions) : DEFAULT_FOOD.portions,
     quickWeekdays: weekdays(f.quickWeekdays),
     trainingWeekdays: weekdays(f.trainingWeekdays),

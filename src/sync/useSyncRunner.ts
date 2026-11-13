@@ -1,6 +1,7 @@
 import { liveQuery } from 'dexie'
 import { useEffect } from 'react'
 import { db } from '../db/db'
+import { savePendingAnswers } from '../db/repo'
 import { COLLECTIONS, runSync } from './engine'
 import { setSyncStatus } from './status'
 import { supabase, supabaseRemote, useSession } from './supabase'
@@ -36,6 +37,8 @@ export function useSyncRunner(): void {
       setSyncStatus({ state: 'syncing', error: '' })
       try {
         await runSync(db, remote, userId!)
+        // Nu är kontots inställningar hämtade: lägg till svaren från frågorna före inloggningen.
+        await savePendingAnswers()
         setSyncStatus({ state: 'idle', lastSync: Date.now(), error: '' })
       } catch (e) {
         setSyncStatus({ state: 'error', error: e instanceof Error ? e.message : 'Synken misslyckades.' })

@@ -51,7 +51,7 @@ export function parseBody(b: unknown): Body | null {
     .filter((p) => p.name)
   const count = typeof o.count === 'number' && o.count >= 1 && o.count <= 3 ? Math.round(o.count) : 3
   const preferences = Array.isArray(o.preferences) ? o.preferences.map((x) => str(x, 200)).filter(Boolean).slice(0, 30) : []
-  return { pantry, mode, wish: str(o.wish, 200), dish: str(o.dish, 100), allergies: str(o.allergies, 300), preferences, count }
+  return { pantry, mode, wish: str(o.wish, 200), dish: str(o.dish, 100), allergies: str(o.allergies, 1000), preferences, count }
 }
 
 const MODE_TEXT: Record<Mode, string> = {

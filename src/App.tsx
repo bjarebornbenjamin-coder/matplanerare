@@ -1,13 +1,18 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ToastBar } from './components/ToastBar'
+import { db } from './db/db'
+import { savePendingAnswers } from './db/repo'
 import { useSettings } from './hooks'
 import { useApplyBackground } from './lib/background'
+import { useOnboarding } from './lib/onboarding'
 import { useNotificationSync } from './push/useNotificationSync'
 import { useSyncRunner } from './sync/useSyncRunner'
 import { syncConfigured, useSession } from './sync/supabase'
 import { LoginScreen } from './sync/LoginForm'
 import { ShopModePage } from './pages/ShopMode'
+import { Onboarding } from './pages/Onboarding'
 import { MenuPage, PantryPage, ShoppingPage } from './pages/Pages'
 import { ScanFoodPage } from './pages/ScanFood'
 import { SettingsPage } from './pages/Settings'
@@ -51,6 +56,13 @@ export function App() {
   const settings = useSettings()
   const session = useSession()
   const theme = settings?.theme
+  const onboarding = useOnboarding()
+  // Utan konto ställs frågorna bara på en helt ny installation, inte för den som redan använder appen.
+  const hasSettings = useLiveQuery(async () => (await db.settings.count()) > 0, [])
+  const loading = !settings || session === undefined || hasSettings === undefined
+  const loggedOut = syncConfigured && !session
+  // Frågorna om portioner, matpreferenser och allergier kommer före inloggningen.
+  const asking = !loading && !onboarding.done && (loggedOut || (!syncConfigured && !hasSettings))
 
   useEffect(() => {
     const root = document.documentElement
@@ -62,9 +74,12 @@ export function App() {
     <BrowserRouter>
       <ScrollToTop />
       <main className="shell">
-        {!settings || session === undefined ? (
+        {loading ? (
           <p className="loading" role="status" aria-busy="true">Laddar…</p>
-        ) : syncConfigured && !session ? (
+        ) : asking ? (
+          // Utan konto finns inget att vänta på: svaren sparas direkt.
+          <Onboarding defaultPortions={settings.food.portions} hasAccounts={syncConfigured} onDone={() => { if (!syncConfigured) void savePendingAnswers() }} />
+        ) : loggedOut ? (
           <LoginScreen />
         ) : (
           <Routes>
@@ -80,7 +95,7 @@ export function App() {
         )}
       </main>
       <ToastBar />
-      {(!syncConfigured || session) && <Nav />}
+      {(!syncConfigured || session) && !asking && <Nav />}
     </BrowserRouter>
   )
 }

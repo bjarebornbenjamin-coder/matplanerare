@@ -1,12 +1,17 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { db } from './db/db'
 import { getAiConfig, withDefaults } from './db/repo'
+import { withAnswers } from './domain/onboarding'
+import { useOnboarding } from './lib/onboarding'
 import type { AiConfig, DishRating, PantryItem, PlannedDinner, PlannedSide, Settings, ShoppingItem } from './domain/types'
 
 /** undefined medan data läses från IndexedDB. */
 export function useSettings(): Settings | undefined {
-  return useLiveQuery(async () => withDefaults(await db.settings.get('main')), [])
+  const stored = useLiveQuery(async () => withDefaults(await db.settings.get('main')), [])
+  // Svaren från frågorna före inloggningen gäller direkt, även innan de hunnit sparas.
+  const { answers } = useOnboarding()
+  return useMemo(() => (stored && answers ? withAnswers(stored, answers) : stored), [stored, answers])
 }
 
 

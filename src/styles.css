@@ -853,3 +853,109 @@ h2.list-section { margin: 14px 4px 6px; }
 .warning .btn { margin-top: 6px; }
 .tidy-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 0 4px; font-size: 14px; }
 .tidy-note .btn { flex: none; margin: 0; }
+
+/* Frågorna före inloggningen */
+.onb { position: fixed; inset: 0; z-index: 30; overflow-y: auto; scroll-padding-bottom: 128px; background: var(--surface); display: flex; flex-direction: column; padding: calc(8px + env(safe-area-inset-top)) max(16px, calc((100vw - 480px) / 2)) 0; }
+.onb-head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; min-height: 48px; flex: none; }
+.onb-progress { display: flex; gap: 6px; }
+.onb-progress span { position: relative; flex: 1; height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+.onb-progress span::after { content: ''; position: absolute; inset: 0; border-radius: 2px; background: var(--primary); transform: scaleX(0); transform-origin: left; }
+.onb-progress span.is-on::after { transform: scaleX(1); }
+.onb-count { text-align: right; font-size: 13px; color: var(--muted); }
+.onb-body { flex: 1; display: flex; flex-direction: column; }
+.onb-step { flex: 1; padding: 16px 0 24px; }
+.onb-step h1 { font-size: 28px; line-height: 34px; font-weight: 500; margin: 4px 0 8px; }
+.onb-step h2 { margin: 24px 0 10px; }
+.onb-step > .muted { font-size: 16px; line-height: 24px; margin: 0; }
+.onb-step > .muted.small { font-size: 13px; line-height: 19px; margin-top: 16px; }
+.onb-foot { position: sticky; bottom: 0; flex: none; display: grid; gap: 4px; padding: 20px 0 calc(16px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--surface) 78%, transparent); }
+.onb-foot .btn.wide { margin-top: 0; }
+.onb-cta { min-height: 54px; font-size: 17px; border-radius: 27px; }
+
+.onb-hero { position: relative; height: min(38dvh, 280px); margin: 0 0 20px; display: grid; place-items: center; }
+.onb-art { height: 100%; max-width: 100%; }
+.onb-art-glow { fill: var(--primary-container); }
+.onb-art-rim { --len: 327; fill: var(--surface); stroke: var(--primary); stroke-width: 5; stroke-dasharray: var(--len); }
+.onb-art-well { --len: 214; fill: none; stroke: var(--primary); stroke-width: 2.5; opacity: 0.45; stroke-dasharray: var(--len); }
+.onb-art-tool { fill: none; stroke: var(--primary); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; --len: 190; stroke-dasharray: var(--len); }
+.onb-pill { position: absolute; padding: 7px 14px; border-radius: 999px; background: var(--surface); color: var(--text); font-size: 14px; font-weight: 500; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14); white-space: nowrap; }
+.onb-pill.p1 { left: 2%; top: 10%; }
+.onb-pill.p2 { right: 0; top: 30%; }
+.onb-pill.p3 { left: 12%; bottom: 6%; }
+
+.onb-stepper { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 36px 0 8px; }
+.onb-round { width: 64px; height: 64px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 0; background: var(--primary-container); color: var(--on-primary-container); cursor: pointer; }
+.onb-round:disabled { opacity: 0.35; cursor: default; }
+.onb-round:focus-visible, .onb-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.onb-number { min-width: 120px; height: 120px; display: grid; place-items: center; overflow: hidden; font-size: 104px; line-height: 1; font-weight: 600; color: var(--primary); }
+.onb-digit { display: block; }
+.onb-plates { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; min-height: 40px; max-width: 320px; margin: 12px auto 0; }
+.onb-dish { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); border: 3px solid var(--primary); box-shadow: inset 0 0 0 5px var(--surface), inset 0 0 0 7px color-mix(in srgb, var(--primary) 45%, transparent); }
+.onb-caption { text-align: center; margin: 14px 0 0; font-size: 17px; font-weight: 500; }
+
+.onb-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.onb-step > h1 + .muted + .onb-chips { margin-top: 24px; }
+.onb-chip { display: inline-flex; align-items: center; min-height: 48px; padding: 0 18px; border-radius: 24px; border: 1.5px solid var(--outline-strong); background: transparent; color: var(--text); font: inherit; font-size: 16px; cursor: pointer; }
+.onb-chip svg { width: 0; margin-right: 0; opacity: 0; flex: none; }
+.onb-chip.is-on { background: var(--primary-container); color: var(--on-primary-container); border-color: transparent; font-weight: 500; }
+.onb-chip.is-on svg { width: 18px; margin-right: 6px; opacity: 1; }
+.onb-other { margin: 24px 0 0; }
+.onb-other input { min-height: 48px; font-size: 16px; }
+
+/* Låga skärmar: mindre bild och rubrik, så att texten ryms ovanför knappen. */
+@media (max-height: 640px) {
+  .onb-hero { height: 24dvh; margin-bottom: 12px; }
+  .onb-pill { font-size: 12px; padding: 5px 10px; }
+  .onb-step h1 { font-size: 24px; line-height: 30px; }
+  .onb-step > .muted { font-size: 15px; line-height: 22px; }
+  .onb-stepper { margin-top: 20px; }
+  .onb-number { height: 96px; font-size: 84px; }
+}
+
+/* Sammanfattningen av svaren på inloggningssidan */
+.login-picks { margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: var(--primary-container); color: var(--on-primary-container); }
+.login-picks-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; }
+.login-picks .btn.text { min-height: 32px; margin: -6px -8px -6px 0; color: inherit; text-decoration: underline; }
+.login-picks ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.login-picks li { padding: 5px 12px; border-radius: 999px; background: var(--surface); color: var(--text); font-size: 14px; }
+.login-ask { display: block; margin: 12px auto 0; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .onb-progress span::after { transition: transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .onb-step.from-next { animation: onb-next 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .onb-step.from-prev { animation: onb-prev 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .onb-step > * { animation: onb-rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .onb-step > :nth-child(2) { animation-delay: 50ms; }
+  .onb-step > :nth-child(3) { animation-delay: 100ms; }
+  .onb-step > :nth-child(4) { animation-delay: 150ms; }
+  .onb-step > :nth-child(n + 5) { animation-delay: 200ms; }
+  .onb-art-glow { transform-origin: 110px 92px; animation: onb-pop 600ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+  .onb-art-rim { animation: onb-draw 900ms 200ms ease-out both; }
+  .onb-art-well { animation: onb-draw 800ms 500ms ease-out both; }
+  .onb-art-tool { animation: onb-draw 700ms 700ms ease-out both; }
+  .onb-pill { animation: onb-pop 520ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both, onb-float 4.5s ease-in-out infinite; }
+  .onb-pill.p1 { animation-delay: 900ms, 1400ms; }
+  .onb-pill.p2 { animation-delay: 1100ms, 1900ms; }
+  .onb-pill.p3 { animation-delay: 1300ms, 2400ms; }
+  .onb-round { transition: transform 120ms ease, opacity 150ms ease; }
+  .onb-round:active:not(:disabled) { transform: scale(0.9); }
+  .onb-digit.up { animation: onb-up 300ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+  .onb-digit.down { animation: onb-down 300ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+  .onb-dish { animation: onb-pop 360ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both; animation-delay: calc(var(--i) * 35ms); }
+  .onb-chip { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 120ms ease; }
+  .onb-chip svg { transition: width 200ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-right 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 160ms ease; }
+  .onb-chip:active { transform: scale(0.95); }
+  .onb-chip.is-on { animation: onb-tick 260ms cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+  .login-picks { animation: onb-rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .login-picks li { animation: onb-pop 360ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both; animation-delay: calc(120ms + var(--i, 0) * 50ms); }
+  @keyframes onb-next { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+  @keyframes onb-prev { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+  @keyframes onb-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes onb-pop { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+  @keyframes onb-draw { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+  @keyframes onb-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+  @keyframes onb-up { from { opacity: 0; transform: translateY(46%) scale(0.8); } to { opacity: 1; transform: none; } }
+  @keyframes onb-down { from { opacity: 0; transform: translateY(-46%) scale(0.8); } to { opacity: 1; transform: none; } }
+  @keyframes onb-tick { 0% { transform: scale(0.94); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+}
+

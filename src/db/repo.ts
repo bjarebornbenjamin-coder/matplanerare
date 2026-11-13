@@ -5,6 +5,8 @@ import { sameShoppingItem } from '../domain/consume'
 import { isSection } from '../domain/storeSection'
 import type { AiConfig, Backup, FoodSettings, PantryItem, Settings, ShoppingItem } from '../domain/types'
 import { db } from './db'
+import { withAnswers } from '../domain/onboarding'
+import { clearPendingAnswers, pendingAnswers } from '../lib/onboarding'
 
 export const newId = () => crypto.randomUUID()
 
@@ -219,14 +221,28 @@ export function withDefaults(stored: Settings | undefined): Settings {
   }
 }
 
+/** Inställningarna, med svaren från frågorna före inloggningen ovanpå så länge de inte är sparade. */
 export async function getSettings(): Promise<Settings> {
-  return withDefaults(await db.settings.get('main'))
+  const stored = withDefaults(await db.settings.get('main'))
+  const answers = pendingAnswers()
+  return answers ? withAnswers(stored, answers) : stored
 }
 
 export async function saveSettings(patch: Partial<Omit<Settings, 'id'>>): Promise<void> {
   await db.transaction('rw', db.settings, async () => {
     await db.settings.put({ ...(await getSettings()), ...patch })
   })
+  // Svaren följde med in i det som sparades, och ska inte läggas ovanpå en gång till.
+  clearPendingAnswers()
+}
+
+/**
+ * Sparar svaren från frågorna före inloggningen i inställningarna. Anropas när kontots
+ * inställningar har hämtats (eller direkt, när appen körs utan konto), så att svaren läggs
+ * till det som redan finns i stället för att ersätta det.
+ */
+export async function savePendingAnswers(): Promise<void> {
+  if (pendingAnswers()) await saveSettings({})
 }
 
 export async function exportAll(): Promise<Backup> {
