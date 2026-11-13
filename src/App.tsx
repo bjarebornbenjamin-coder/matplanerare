@@ -12,7 +12,8 @@ import { startTour, useTour } from './lib/tour'
 import { useNotificationSync } from './push/useNotificationSync'
 import { useSyncRunner } from './sync/useSyncRunner'
 import { syncConfigured, useSession } from './sync/supabase'
-import { LoginScreen } from './sync/LoginForm'
+import { LoginScreen, NewPasswordScreen } from './sync/LoginForm'
+import { useRecovery } from './sync/recovery'
 import { ShopModePage } from './pages/ShopMode'
 import { Onboarding } from './pages/Onboarding'
 import { MenuPage, PantryPage, ShoppingPage } from './pages/Pages'
@@ -66,8 +67,11 @@ export function App() {
   // Frågorna om portioner, matpreferenser och allergier kommer före inloggningen.
   const asking = !loading && !onboarding.done && (loggedOut || (!syncConfigured && !hasSettings))
   // Första gången man kommer in i appen visas en rundtur som lyser upp det viktigaste.
+  // Den som kommit in via länken i mejlet om glömt lösenord väljer först ett nytt lösenord.
+  const recovery = useRecovery()
+  const recovering = !loading && Boolean(session) && (recovery.active || recovery.pending)
   const tour = useTour()
-  const inApp = !loading && !asking && !loggedOut
+  const inApp = !loading && !asking && !loggedOut && !recovering
   useEffect(() => {
     if (inApp && !tour.done && !tour.active) startTour()
   }, [inApp, tour.done, tour.active])
@@ -84,6 +88,8 @@ export function App() {
       <main className="shell">
         {loading ? (
           <p className="loading" role="status" aria-busy="true">Laddar…</p>
+        ) : recovering ? (
+          <NewPasswordScreen email={session?.user.email} />
         ) : asking ? (
           // Utan konto finns inget att vänta på: svaren sparas direkt.
           <Onboarding defaultPortions={settings.food.portions} hasAccounts={syncConfigured} onDone={() => { if (!syncConfigured) void savePendingAnswers() }} />
@@ -104,7 +110,7 @@ export function App() {
       </main>
       <ToastBar />
       {inApp && tour.active && <Tour />}
-      {(!syncConfigured || session) && !asking && <Nav />}
+      {(!syncConfigured || session) && !asking && !recovering && <Nav />}
     </BrowserRouter>
   )
 }

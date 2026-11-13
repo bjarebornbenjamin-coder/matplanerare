@@ -1010,3 +1010,7 @@ button.settings-row { width: 100%; border: 0; background: none; font: inherit; c
 /* Länkarna under frukost och lunch radbryts jämnt, utan indrag på andra raden. */
 .side-links { display: flex; flex-wrap: wrap; gap: 0 16px; }
 .side-links .side-link + .side-link { margin-left: 0; }
+/* Glömt lösenordet: länken under lösenordsfältet. */
+.login-form .btn.login-forgot { display: inline-flex; margin: -2px 0 14px; font-size: 14px; }
+.login .warning { margin: 12px 0; }
+.login .warning p { margin: 0 0 8px; }

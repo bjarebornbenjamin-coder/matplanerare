@@ -58,6 +58,7 @@ Lokalt först: allt fungerar offline i IndexedDB. När du loggar in synkas meny 
    - `SUPABASE_URL`, `SUPABASE_ANON_KEY` och `ALLOWED_EMAILS` (din e-postadress) så att servern bara släpper in dig till OpenAI-anropen
 5. Öppna appen. När synken är installerad börjar appen med en inloggningssida: skriv e-post (samma som i `ALLOWED_EMAILS`) och ett lösenord och tryck **Skapa konto**. Din befintliga data laddas upp första gången. Inloggningen sparas på enheten.
 6. **Stäng sedan av nya registreringar** (Authentication → Sign In / Providers → "Allow new users to sign up" av). Det är en personlig app.
+7. **Glömt lösenord:** lägg till appens adress (t.ex. `https://din-app.vercel.app`) under Authentication → URL Configuration → Redirect URLs. Länken "Glömt lösenordet?" på inloggningssidan skickar ett mejl via Supabase, och länken i mejlet leder tillbaka till appen där ett nytt lösenord väljs. Utan adressen i listan leder länken till projektets Site URL i stället. Supabase egna mejltjänst skickar bara några få mejl i timmen, vilket räcker för en personlig app. Texten i mejlet ändras under Authentication → Emails → Reset Password.
 
 Konflikter: en ändring du gjort lokalt men inte hunnit synka vinner över en inkommande ändring; i övrigt gäller senaste skrivningen på servern. Borttagningar synkas.
 
