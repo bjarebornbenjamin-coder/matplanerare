@@ -78,7 +78,8 @@ export async function recipeForDish(dish: string, q: Omit<RecipeQuery, 'mode' | 
   }
 }
 
-const UNIT = '(?:kg|hg|g|l|dl|cl|ml|msk|tsk|krm|st|förp|förpackning(?:ar)?|paket|burk(?:ar)?|klyft(?:a|or)|skiv(?:a|or)|kruk(?:a|or)|knippe|näve|nypa)'
+// Längre ord först, så att "förpackning" inte läses som "förp" och "stjälk" inte som "st".
+const UNIT = '(?:förpackning(?:ar)?|tärning(?:ar)?|portion(?:er)?|stjälk(?:ar)?|flask(?:a|or)|klyft(?:a|or)|skiv(?:a|or)|kruk(?:a|or)|kvist(?:ar)?|huvud(?:en)?|burk(?:ar)?|knippen?|pås(?:e|ar)|ask(?:ar)?|bit(?:ar)?|tub(?:er)?|nyp(?:a|or)|näv(?:e|ar)|paket|förp|blad|port|pkt|frp|brk|msk|tsk|krm|kg|hg|dl|cl|ml|cm|st|g|l)'
 const SPLIT = new RegExp(`^((?:ca\\.?\\s*)?[\\d½¼¾⅓⅔.,/–-]+(?:\\s*[\\d½¼¾⅓⅔.,/–-]+)?\\s*(?:${UNIT}\\.?)?)\\s+(.+)$`, 'i')
 
 /** "400 g kycklingfilé, i bitar" → { amount: "400 g", name: "kycklingfilé, i bitar" } */

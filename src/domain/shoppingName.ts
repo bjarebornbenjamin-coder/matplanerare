@@ -13,6 +13,7 @@ const DESCRIPTORS = [
   'skivade', 'skivad', 'pressade', 'pressad', 'kokta', 'kokt', 'kalla', 'kall',
   'rumsvarma', 'rumsvarmt', 'rumsvarm', 'mjukt', 'mjuk', 'smält', 'smälta', 'skalade', 'skalad',
   'ätmogna', 'ätmogen', 'ätmoget', 'mogna', 'mogen', 'moget',
+  'liten', 'litet', 'små', 'stor', 'stort', 'stora', 'medelstor', 'medelstora', 'mellanstor', 'mellanstora', 'normalstor', 'normalstora',
   'urkärnade', 'urkärnad', 'avrunna', 'avrunnen', 'sköljda', 'nymalen', 'nymald', 'gärna', 'ca', 'ca.', 'cirka', 'ev', 'ev.', 'eventuellt', 'ekologisk', 'ekologiska',
 ]
 /** Sist i raden: "efter smak", "till servering" osv. */
@@ -32,7 +33,8 @@ export function cleanName(raw: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLocaleLowerCase('sv')
-  s = s.replace(TAIL, '').replace(LEADING_QTY, '').replace(TRAILING_QTY, '').trim()
+  // "à 400 g krossade tomater" (resten av "2 burkar à 400 g …") är bara tomaterna.
+  s = s.replace(TAIL, '').replace(/^à\s+/, '').replace(LEADING_QTY, '').replace(TRAILING_QTY, '').trim()
   let changed = true
   while (changed) {
     changed = false
@@ -66,8 +68,31 @@ export function tidyAmount(amount: string | undefined): string {
 export function shoppingAmount(amount: string | undefined): string | undefined {
   const a = tidyAmount(amount)
   if (!a) return undefined
-  if (/\b(krm|tsk|msk|nypa|nypor|kvist|kvistar|blad)\b/i.test(a)) return undefined
+  if (/\b(krm|tsk|msk|nypa|nypor|kvist|kvistar|blad|näve|nävar|stjälk|stjälkar|skiva|skivor|tärning|tärningar)\b/i.test(a)) return undefined
   const g = /^(\d+(?:[.,]\d+)?)\s*g\b/i.exec(a)
   if (g && Number(g[1].replace(',', '.')) < 25) return undefined
   return a
 }
+
+/** Mått som hamnar först i namnet när receptsidan skriver "0,5 ask ärtskott" eller "12 cm gurka". */
+const LEADING_UNITS = new Set([
+  'ask', 'askar', 'cm', 'kruka', 'krukor', 'burk', 'burkar', 'brk', 'påse', 'påsar', 'paket', 'pkt', 'förp', 'frp', 'förpackning', 'förpackningar', 'knippe', 'knippen',
+  'bit', 'bitar', 'näve', 'nävar', 'tärning', 'tärningar', 'kvist', 'kvistar', 'stjälk', 'stjälkar', 'blad', 'huvud', 'huvuden', 'tub', 'tuber', 'flaska', 'flaskor',
+  'st', 'skiva', 'skivor', 'klyfta', 'klyftor', 'nypa', 'nypor',
+])
+
+/**
+ * Flyttar ett mått som står först i namnet till mängden: "Ask ärtskott" med mängden "0,5" blir
+ * "ärtskott" och "0,5 ask", "Cm gurka" med "12 st" blir "gurka" och "12 cm". Mängder som redan
+ * har en annan enhet ("200 g") lämnas som de är.
+ */
+export function unitFromName(name: string, amount?: string): { name: string; amount?: string } {
+  const m = /^([a-zåäö]+)\.?\s+(\S.*)$/i.exec(name.trim())
+  if (!m || !LEADING_UNITS.has(m[1].toLowerCase())) return { name, ...(amount ? { amount } : {}) }
+  const a = (amount ?? '').trim()
+  // En ren siffra, eller en siffra som fått "st" för att enheten saknades.
+  const n = /^((?:ca\.?\s*)?[\d½¼¾.,/–-]+(?:\s+\d+\/\d+)?)(?:\s*st)?$/i.exec(a)
+  if (a && !n) return { name: m[2], amount: a }
+  return { name: m[2], amount: `${n ? n[1] : '1'} ${m[1].toLowerCase()}` }
+}
+

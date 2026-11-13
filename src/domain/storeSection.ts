@@ -20,7 +20,7 @@ const RULES: [Section, string[]][] = [
     'äpple', 'äpplen', 'banan', 'apelsin', 'citron', 'lime', 'päron', 'druv', 'bär', 'jordgubb', 'hallon', 'melon', 'avokado', 'mango', 'kiwi', 'clementin',
     'tomat', 'gurka', 'sallad', 'spenat', 'ruccola', 'paprika', 'lök', 'purjo', 'morot', 'morötter', 'potatis', 'broccoli', 'blomkål', 'zucchini', 'aubergine',
     'svamp', 'champinjon', 'kål', 'selleri', 'ingefära', 'chili', 'majs', 'rödbet', 'palsternacka', 'squash', 'sparris',
-    'basilika', 'koriander', 'persilja', 'dill', 'gräslök', 'mynta',
+    'basilika', 'koriander', 'persilja', 'dill', 'gräslök', 'mynta', 'skott', 'groddar', 'rosmarin', 'salvia',
   ]],
   ['Skafferi', [
     'pasta', 'spaghetti', 'makaron', 'penne', 'ris', 'nudl', 'bulgur', 'couscous', 'quinoa', 'mjöl', 'socker', 'havregryn', 'müsli', 'flingor', 'gryn',

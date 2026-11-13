@@ -17,7 +17,7 @@ describe('ihopslagning av inköpslistan', () => {
     expect(r.lines).toEqual([
       { name: 'Gul lök', amount: '3 st + 1,5 dl', note: 'Morotssoppa med naanbröd, Tomat- och örtbräserad kyckling, Morotsoppa med bröd, Köttfärssås med spaghetti' },
       { name: 'Gul paprika', amount: '1 st', note: 'Tomat- och örtbräserad kyckling' },
-      { name: 'Koriander', amount: '1/2 kruka', note: 'Morots- och ingefärssoppa med jordnötshack' },
+      { name: 'Koriander', amount: '1 kruka', note: 'Morots- och ingefärssoppa med jordnötshack' }, // en halv kruka går inte att köpa
       { name: 'Tandkräm' },
     ])
   })
@@ -37,12 +37,12 @@ describe('ihopslagning av inköpslistan', () => {
     expect(addAmounts(['200 g', '300 g', '1 kg'])).toBe('1,5 kg')
     expect(addAmounts(['2 dl', '3 dl'])).toBe('5 dl')
     expect(addAmounts(['1', '2 st', undefined])).toBe('3 st')
-    expect(addAmounts(['1 burk', '1 burk', '400 g'])).toBe('400 g + 2 burkar') // två recept som vill ha en burk var = två burkar
+    expect(addAmounts(['1 burk', '1 burk', '400 g'])).toBe('2 burkar + 400 g') // två recept som vill ha en burk var = två burkar
     expect(addAmounts(['1 bit', ''])).toBeUndefined()
   })
   it('avdelningen från AI:n följer med vid ihopslagning', () => {
     const r = mergeShopping([{ name: 'Röda lökar', amount: '4 st', note: 'Chili sin carne', section: 'Frukt & grönt' }, { name: 'Rödlök', amount: '0,5 st', note: 'Tzatziki' }])
-    expect(r.lines).toEqual([{ name: 'Rödlök', amount: '4,5 st', note: 'Chili sin carne, Tzatziki', section: 'Frukt & grönt' }])
+    expect(r.lines).toEqual([{ name: 'Rödlök', amount: '5 st', note: 'Chili sin carne, Tzatziki', section: 'Frukt & grönt' }])
   })
   it('reserven utan AI känner igen ätmogna bananer och bladspenat', () => {
     const r = mergeShopping([{ name: 'ätmogna bananer', amount: '3 st', note: 'Smoothie' }, { name: 'Bananer', amount: '2 st', note: 'Pannkakor' }, { name: 'Bladspenat', amount: '65 g', note: 'Laxpasta' }, { name: 'spenat', amount: '100 g', note: 'Äggmuffins' }])
@@ -98,9 +98,49 @@ describe('ihopslagning av inköpslistan', () => {
   })
   it('förpackningar räknas ihop i stället för att tappas', () => {
     expect(addAmounts(['1 kruka', '1 kruka'])).toBe('2 krukor')
-    expect(addAmounts(['1 burk', '2 burkar', '400 g'])).toBe('400 g + 3 burkar')
+    expect(addAmounts(['1 burk', '2 burkar', '400 g'])).toBe('3 burkar + 400 g')
     expect(addAmounts(['1 paket'])).toBe('1 paket')
-    expect(addAmounts(['2 klyftor', '1 klyfta', '1 knippe'])).toBe('3 klyftor + 1 knippe')
-    expect(addAmounts(['2 burkar à 400 g', '2 burkar à 400 g'])).toBe('2 burkar à 400 g') // går inte att räkna: lämnas
+    expect(addAmounts(['2 burkar à 400 g', '2 burkar à 400 g'])).toBe('4 burkar')
+    expect(addAmounts(['1 pkt', '1 paket', '1 förpackning', '2 frp'])).toBe('2 paket + 3 förp')
+  })
+  it('summan görs om till det man köper: hela styck och hela förpackningar', () => {
+    expect(addAmounts(['0,5'], 'Citron')).toBe('1 st')
+    expect(addAmounts(['0,5 st', '1/2', '0,25 st'], 'Lime')).toBe('2 st') // 1,25 avrundas uppåt en gång, inte per rad
+    expect(addAmounts(['0,5 ask'], 'Ärtskott')).toBe('1 ask')
+    expect(addAmounts(['1 kruka + 1/2 kruka'], 'Basilika')).toBe('2 krukor')
+    expect(addAmounts(['1 kruka', '½ kruka', '1 1/2 kruka'], 'Basilika')).toBe('3 krukor')
+    expect(addAmounts(['2-3 st'], 'Morot')).toBe('3 st')
+    expect(addAmounts(['1 huvud'], 'Isbergssallad')).toBe('1 st')
+    expect(addAmounts(['200 g', '0,3 kg'], 'Halloumi')).toBe('500 g') // vikt och volym avrundas inte
+  })
+  it('centimeter och klyftor blir styck', () => {
+    expect(addAmounts(['12 cm'], 'Gurka')).toBe('1 st')
+    expect(addAmounts(['12 cm', '12 cm', '12 cm'], 'Gurka')).toBe('2 st') // 36 cm är mer än en gurka
+    expect(addAmounts(['10 cm'], 'Purjolök')).toBe('1 st')
+    expect(addAmounts(['3 cm', '1 st'], 'Ingefära')).toBe('2 st')
+    expect(addAmounts(['2 klyftor', '1 klyfta', '4 klyftor'], 'Vitlök')).toBe('1 st') // en vitlök räcker till sju klyftor
+    expect(addAmounts(['12 klyftor'], 'Vitlök')).toBe('2 st')
+  })
+  it('örter i volym och sådant som mäts i skivor eller nävar visas utan mängd', () => {
+    expect(addAmounts(['0,5 dl'], 'Koriander')).toBeUndefined()
+    expect(addAmounts(['0,5 dl', '1 kruka'], 'Koriander')).toBe('1 kruka')
+    expect(addAmounts(['4 skivor'], 'Bacon')).toBeUndefined()
+    expect(addAmounts(['1 näve', '2 msk'], 'Ruccola')).toBeUndefined()
+    expect(addAmounts(['2 dl'], 'Grädde')).toBe('2 dl') // annat i volym står kvar
+  })
+  it('mått som hamnat i namnet flyttas till mängden och raden blir ren', () => {
+    const r = mergeShopping([
+      { name: 'Ask ärtskott', amount: '0,5 st', note: 'Halloumi tikka masala' },
+      { name: 'Cm gurka', amount: '12 st', note: 'Halloumisallad, Kyckling med gurksallad' },
+      { name: 'Basilika', amount: '1 kruka + 1/2 kruka', note: 'Pho, Caprese' },
+      { name: 'Citron', amount: '0,5 st', note: 'Kycklinggryta' },
+      { name: 'Delikatesspotatis', amount: '3,4 kg', note: 'Lammcurry' },
+    ])
+    expect(r.lines.map((l) => `${l.name} · ${l.amount}`)).toEqual(['Ärtskott · 1 ask', 'Gurka · 1 st', 'Basilika · 2 krukor', 'Citron · 1 st', 'Delikatesspotatis · 3,4 kg'])
+    expect(r.changed).toBe(true)
+  })
+  it('gurka i centimeter slås ihop med gurka i styck', () => {
+    const r = mergeShopping([{ name: 'cm gurka', amount: '12', note: 'Sallad' }, { name: 'Gurka', amount: '1 st', note: 'Tzatziki' }])
+    expect(r.lines).toEqual([{ name: 'Gurka', amount: '2 st', note: 'Sallad, Tzatziki' }])
   })
 })

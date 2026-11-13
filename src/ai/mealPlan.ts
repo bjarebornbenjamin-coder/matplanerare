@@ -3,7 +3,7 @@ import { daysLeft, foodKey } from '../domain/food'
 import type { FoodSettings, ISODate, PantryItem, PlannedDinner, PlannedSide, SideSlot } from '../domain/types'
 import { AiError, describeError } from './errors'
 import { parseQty, withPantryStatus } from './recipes'
-import { cleanName, shoppingAmount } from '../domain/shoppingName'
+import { cleanName, shoppingAmount, unitFromName } from '../domain/shoppingName'
 
 export interface DayContext {
   date: ISODate
@@ -266,8 +266,10 @@ export function missingNeeds(plan: { title: string; ingredients: { name: string;
     withPantryStatus(d.ingredients, pantry)
       .filter((i) => i.status === 'missing')
       .map((i) => {
-        const amount = shoppingAmount(i.amount)
-        return { name: cleanName(i.name), ...(amount ? { amount } : {}), dish: d.title }
+        // "0,5 ask ärtskott" kan ha sparats med måttet i namnet: flytta det till mängden.
+        const item = unitFromName(i.name, i.amount)
+        const amount = shoppingAmount(item.amount)
+        return { name: cleanName(item.name), ...(amount ? { amount } : {}), dish: d.title }
       }),
   )
 }

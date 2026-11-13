@@ -13,6 +13,18 @@ describe('receptsökning i appen', () => {
     expect(splitIngredient('1 1/2 dl grädde')).toEqual({ amount: '1 1/2 dl', name: 'grädde' })
     expect(splitIngredient('2 klyftor vitlök')).toEqual({ amount: '2 klyftor', name: 'vitlök' })
     expect(splitIngredient('salt och peppar')).toEqual({ amount: '', name: 'salt och peppar' })
+    // Mått som receptsidor använder och som annars hamnar i namnet.
+    expect(splitIngredient('0,5 ask ärtskott')).toEqual({ amount: '0,5 ask', name: 'ärtskott' })
+    expect(splitIngredient('12 cm gurka')).toEqual({ amount: '12 cm', name: 'gurka' })
+    expect(splitIngredient('1/2 kruka basilika')).toEqual({ amount: '1/2 kruka', name: 'basilika' })
+    expect(splitIngredient('1 pkt bacon')).toEqual({ amount: '1 pkt', name: 'bacon' })
+    expect(splitIngredient('2 stjälkar blekselleri')).toEqual({ amount: '2 stjälkar', name: 'blekselleri' })
+    expect(splitIngredient('1 förpackning halloumi')).toEqual({ amount: '1 förpackning', name: 'halloumi' })
+    // Ord som bara börjar som ett mått hör till varan.
+    expect(splitIngredient('2 gurkor')).toEqual({ amount: '2', name: 'gurkor' })
+    expect(splitIngredient('1 lök')).toEqual({ amount: '1', name: 'lök' })
+    expect(splitIngredient('2 portabellosvampar')).toEqual({ amount: '2', name: 'portabellosvampar' })
+    expect(splitIngredient('1 bladselleri')).toEqual({ amount: '1', name: 'bladselleri' })
   })
   it('markerar det som finns hemma, basvaror och det som saknas', () => {
     expect(ingredientStatuses(['500 g kycklingfilé, i bitar', '2 dl grädde', '1 tsk salt', '1 gul lök'], pantry).map((i) => i.status)).toEqual(['pantry', 'pantry', 'staple', 'missing'])

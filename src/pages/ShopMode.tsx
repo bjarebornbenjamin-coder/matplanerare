@@ -76,7 +76,7 @@ function ShopRow({ item, leaving, onCheck }: { item: ShoppingItem; leaving: bool
         </span>
         <span className="shop-text">
           <span className="shop-name"><span>{item.name}</span></span>
-          {(amount || item.note) && <span className="shop-sub">{[amount, item.note].filter(Boolean).join(' · ')}</span>}
+          {amount && <span className="shop-sub">{amount}</span>}
         </span>
       </button>
     </li>

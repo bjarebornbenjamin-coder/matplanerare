@@ -959,3 +959,13 @@ h2.list-section { margin: 14px 4px 6px; }
   @keyframes onb-tick { 0% { transform: scale(0.94); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
 }
 
+/* Inköpslistan: en rad per vara som i lagret. Rätterna fälls ut när man trycker på raden. */
+.task-main .title.has-more { display: inline-flex; align-items: center; gap: 4px; }
+.task-main .title .caret { flex: none; color: var(--muted); opacity: 0.7; }
+.task-main .title .caret.up { transform: rotate(180deg); }
+.task-main[aria-expanded='true'] .sub { margin-top: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .task-main .title .caret { transition: transform 180ms ease; }
+  .task-main[aria-expanded='true'] .sub { animation: enter 180ms ease both; }
+}
+

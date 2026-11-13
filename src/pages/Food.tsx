@@ -81,6 +81,8 @@ export function ShoppingTab() {
   const [picked, setPicked] = useState<Set<string> | null>(null)
   /** Namnet den ihopslagna raden ska få, om användaren valt ett annat än förslaget. */
   const [pickName, setPickName] = useState('')
+  /** Raden som är utfälld och visar vilka rätter varan är till. */
+  const [shown, setShown] = useState<string | null>(null)
 
   // AI:n går igenom listan när den öppnas, om det tillkommit varor sedan sist. En gång per
   // besök, så att Ångra inte genast görs om.
@@ -132,23 +134,35 @@ export function ShoppingTab() {
     if (name) setMessage(`Appen kommer ihåg att de här varorna är ${name}.`)
   }
 
+  const label = (i: (typeof shopping)[number]) => `${i.name}${tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}`
+
+  // Raderna ser ut som i lagret: vara och mängd på en rad. Vilka rätter varan är till visas
+  // först när man trycker på raden.
   const row = (i: (typeof shopping)[number]) =>
     picked && !i.done ? (
       // Läget "slå ihop": hela raden väljs, och den kan varken bockas av eller tas bort av misstag.
       <label key={i.id} className={`card task pick${picked.has(i.id) ? ' is-picked' : ''}`}>
         <input type="checkbox" aria-label={`Välj ${i.name}`} checked={picked.has(i.id)} onChange={() => togglePick(i.id)} />
         <div className="task-main" style={{ cursor: 'pointer' }}>
-          <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
-          {i.note && <span className="sub note">{i.note}</span>}
+          <span className="title">{label(i)}</span>
         </div>
       </label>
     ) : (
       <div key={i.id} className={`card task${i.done ? ' done' : ''}`}>
         <input type="checkbox" aria-label={`Köpt: ${i.name}`} checked={i.done} onChange={(e) => saveShoppingItem({ ...i, done: e.target.checked })} />
-        <div className="task-main" style={{ cursor: 'default' }}>
-          <span className="title">{i.name}{tidyAmount(i.amount) ? ` · ${tidyAmount(i.amount)}` : ''}</span>
-          {i.note && <span className="sub note">{i.note}</span>}
-        </div>
+        {i.note ? (
+          <button type="button" className="task-main" aria-expanded={shown === i.id} aria-label={`${label(i)}: visa rätter`} onClick={() => setShown(shown === i.id ? null : i.id)}>
+            <span className="title has-more">
+              {label(i)}
+              <svg className={`caret${shown === i.id ? ' up' : ''}`} viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </span>
+            {shown === i.id && <span className="sub">Till {i.note}</span>}
+          </button>
+        ) : (
+          <div className="task-main" style={{ cursor: 'default' }}>
+            <span className="title">{label(i)}</span>
+          </div>
+        )}
         <button type="button" className="btn" aria-label={`Ta bort ${i.name}`} onClick={() => undoable(`${i.name} är borttagen från listan`, ['shopping'], () => deleteShoppingItem(i.id))}>Ta bort</button>
       </div>
     )

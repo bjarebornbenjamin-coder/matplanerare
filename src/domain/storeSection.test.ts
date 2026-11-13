@@ -17,4 +17,8 @@ describe('butikens avdelningar', () => {
     expect(SECTIONS[0]).toBe('Frukt & grönt')
     expect(SECTIONS[SECTIONS.length - 1]).toBe('Övrigt')
   })
+  it('skott och groddar står bland grönsakerna', () => {
+    expect(sectionOf('Ärtskott')).toBe('Frukt & grönt')
+    expect(sectionOf('Böngroddar')).toBe('Frukt & grönt')
+  })
 })

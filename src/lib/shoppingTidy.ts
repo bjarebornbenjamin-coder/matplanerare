@@ -71,8 +71,8 @@ export function useShoppingTidy(): TidyState {
   )
 }
 
-// v3: städningen gjordes om så att AI:n inte kan ta bort varor; gamla listor gås igenom en gång till.
-const KEY = 'matplanerare-shopping-tidied-v3'
+// v4: mängderna görs om till det man köper (hela styck och förpackningar); gamla listor gås igenom en gång till.
+const KEY = 'matplanerare-shopping-tidied-v4'
 
 function tidiedKeys(): Set<string> {
   try {
