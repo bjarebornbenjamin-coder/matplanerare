@@ -65,4 +65,31 @@ describe('recipeForDish', () => {
     await recipeForDish('Lasagne', q, {}, (async () => { calls++; return respond(true) }) as unknown as typeof fetch)
     expect(calls).toBe(1)
   })
+
+  it('en lunch får bara ett recept som är en riktig lunch', async () => {
+    const found = (title: string) => new Response(JSON.stringify({ recipes: [{ ...recipe, title }] }), { status: 200 })
+    // Sökningen på rätten ger en fruktsallad: den godtas inte, och nästa fråga ber om en lunchrätt.
+    const bodies: Record<string, unknown>[] = []
+    const fetchFn = (async (_u: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)))
+      return found(bodies.length === 1 ? 'Fruktsallad med mango och ananas' : 'Mangosallad med kyckling')
+    }) as typeof fetch
+    expect((await recipeForDish('Mangosallad', q, {}, fetchFn, 'lunch'))?.title).toBe('Mangosallad med kyckling')
+    expect(bodies[1].wish).toMatch(/Mangosallad, eller en liknande mättande lunchrätt \(inte smoothie, fruktsallad eller efterrätt\)/)
+    expect(String(bodies[1].wish).length).toBeLessThanOrEqual(200)
+    // Blir det inget annat än en smoothie hittas inget recept alls.
+    expect(await recipeForDish('Grön sallad', q, {}, (async () => found('Green smoothie med kiwi och spenat')) as unknown as typeof fetch, 'lunch')).toBeNull()
+    // Utan lunchkravet (middag, frukost) godtas receptet som förut.
+    expect((await recipeForDish('Smoothie', q, {}, (async () => found('Green smoothie med kiwi och spenat')) as unknown as typeof fetch))?.title).toBe('Green smoothie med kiwi och spenat')
+  })
+  it('önskemålet ryms hos servern även för en lång rätt', async () => {
+    let wish = ''
+    const fetchFn = (async (_u: string, init: RequestInit) => {
+      const b = JSON.parse(String(init.body))
+      if (b.wish) wish = b.wish
+      return new Response('{}', { status: 404 })
+    }) as typeof fetch
+    await recipeForDish('x'.repeat(100), q, {}, fetchFn, 'lunch')
+    expect(wish.length).toBeLessThanOrEqual(200)
+  })
 })

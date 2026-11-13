@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOX_DAYS, INSPIRATION, MEAL_PLAN_PROMPT, boxSides, fetchVariedMealPlan, pickInspiration, repeats, sameDish, dayContext, fetchMealPlan, mealPlanUserContent, parseSides, planDays, missingForPlan, parseMealPlan, planStart } from './mealPlan'
+import { BOX_DAYS, INSPIRATION, LUNCH_PROMPT, MEAL_PLAN_PROMPT, parseLunches, boxSides, fetchVariedMealPlan, pickInspiration, repeats, sameDish, dayContext, fetchMealPlan, mealPlanUserContent, parseSides, planDays, missingForPlan, parseMealPlan, planStart } from './mealPlan'
 import type { PantryItem, PlannedDinner } from '../domain/types'
 
 const food = { quickWeekdays: [2], trainingWeekdays: [3] }
@@ -203,3 +203,68 @@ describe('tumme upp och ner', () => {
     expect(MEAL_PLAN_PROMPT).toMatch(/disliked/)
   })
 })
+
+describe('lunchen ska vara en riktig lunch', () => {
+  const days = ['2026-11-14', '2026-11-15', '2026-11-16'].map((d) => ({ ...dayContext(d, food), lunch: true }))
+  const input = { days, pantry, food: { allergies: 'Vegetariskt', portions: 2 }, memories: ['Gillar stark mat'], recent: [], today: '2026-11-14' }
+  const plan = (lunches: string[]) => JSON.stringify({ days: days.map((d, i) => ({ date: d.date, title: ['Lasagne', 'Fiskgratäng', 'Tacos'][i], minutes: 40, lunch: { title: lunches[i], minutes: 15 } })) })
+  const reply = (content: string) => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+
+  it('instruktionen säger vad en lunch är och vad den inte får vara', () => {
+    expect(MEAL_PLAN_PROMPT).toMatch(/RIKTIG lunch som man blir mätt på/)
+    expect(MEAL_PLAN_PROMPT).toMatch(/ALDRIG smoothie, fruktsallad/)
+    expect(MEAL_PLAN_PROMPT).not.toMatch(/enkel, snabb lunch/)
+    expect(LUNCH_PROMPT).toMatch(/ALDRIG smoothie, fruktsallad/)
+  })
+
+  it('smoothie och fruktsallad byts mot riktiga luncher, och bara för de dagarna', async () => {
+    const sent: { system: string; user: Record<string, unknown> }[] = []
+    const fetchFn = (async (_u: string, init: RequestInit) => {
+      const m = JSON.parse(String(init.body)).messages
+      sent.push({ system: m[0].content, user: JSON.parse(m[1].content) })
+      if (m[0].content === MEAL_PLAN_PROMPT) return reply(plan(['Fruktsallad med mango och ananas', 'Linssoppa med bröd', 'Green smoothie med kiwi och spenat']))
+      return reply(JSON.stringify({ lunches: [{ date: '2026-11-14', title: 'Halloumisallad', minutes: 20 }, { date: '2026-11-16', title: 'Omelett med ost', minutes: 10 }, { date: '2026-11-15', title: 'Ska inte användas', minutes: 5 }] }))
+    }) as typeof fetch
+    const r = await fetchVariedMealPlan(input, 'm', {}, fetchFn)
+    expect(r.sides.map((x) => [x.date, x.title, x.minutes])).toEqual([['2026-11-14', 'Halloumisallad', 20], ['2026-11-15', 'Linssoppa med bröd', 15], ['2026-11-16', 'Omelett med ost', 10]])
+    expect(sent).toHaveLength(2)
+    expect(sent[1].system).toBe(LUNCH_PROMPT)
+    expect(sent[1].user).toMatchObject({ dates: ['2026-11-14', '2026-11-16'], allergies: 'Vegetariskt', preferences: ['Gillar stark mat'] })
+    expect(sent[1].user.avoid).toEqual(expect.arrayContaining(['Lasagne', 'Linssoppa med bröd', 'Green smoothie med kiwi och spenat']))
+  })
+
+  it('är alla luncher riktiga ställs ingen extra fråga', async () => {
+    let calls = 0
+    const fetchFn = (async () => { calls++; return reply(plan(['Kycklingsallad', 'Tomatsoppa', 'Wrap med bönor'])) }) as typeof fetch
+    const r = await fetchVariedMealPlan(input, 'm', {}, fetchFn)
+    expect(calls).toBe(1)
+    expect(r.sides.map((x) => x.title)).toEqual(['Kycklingsallad', 'Tomatsoppa', 'Wrap med bönor'])
+  })
+
+  it('kommer ingen riktig lunch andra gången heller tas lunchen bort den dagen', async () => {
+    const again = (async (_u: string, init: RequestInit) => {
+      const system = JSON.parse(String(init.body)).messages[0].content
+      return system === MEAL_PLAN_PROMPT ? reply(plan(['Smoothie bowl', 'Pastasallad', 'Yoghurt med granola'])) : reply(JSON.stringify({ lunches: [{ date: '2026-11-14', title: 'Bärsmoothie' }, { date: '2026-11-16', title: 'Räkmacka', minutes: 10 }] }))
+    }) as typeof fetch
+    expect((await fetchVariedMealPlan(input, 'm', {}, again)).sides.map((x) => x.title)).toEqual(['Pastasallad', 'Räkmacka'])
+    const down = (async (_u: string, init: RequestInit) => (JSON.parse(String(init.body)).messages[0].content === MEAL_PLAN_PROMPT ? reply(plan(['Smoothie bowl', 'Pastasallad', 'Kycklingwrap'])) : new Response('', { status: 504 }))) as typeof fetch
+    const r = await fetchVariedMealPlan(input, 'm', {}, down)
+    expect(r.sides.map((x) => x.title)).toEqual(['Pastasallad', 'Kycklingwrap'])
+    expect(r.dinners).toHaveLength(3) // middagarna påverkas inte
+  })
+
+  it('svaret med nya luncher läses säkert', () => {
+    const dates = ['2026-11-14', '2026-11-15']
+    expect(parseLunches(JSON.stringify({ lunches: [{ date: '2026-11-14', title: ' Tonfisksallad ', minutes: 15 }, { date: '2026-11-14', title: 'Dubblett' }, { date: '2026-12-01', title: 'Fel datum' }, { date: '2026-11-15', title: 'Fruktsallad' }, null] }), dates)).toEqual([{ date: '2026-11-14', title: 'Tonfisksallad', minutes: 15 }])
+    expect(parseLunches('inte json', dates)).toEqual([])
+    expect(parseLunches('{}', dates)).toEqual([])
+  })
+
+  it('frukost och middag berörs inte av lunchkontrollen', async () => {
+    const both = [{ ...dayContext('2026-11-14', food), lunch: true, breakfast: true }]
+    const fetchFn = (async () => reply(JSON.stringify({ days: [{ date: '2026-11-14', title: 'Lasagne', lunch: { title: 'Kycklingsallad', minutes: 15 }, breakfast: { title: 'Smoothie bowl med hallon', minutes: 5 } }] }))) as typeof fetch
+    const r = await fetchVariedMealPlan({ ...input, days: both }, 'm', {}, fetchFn)
+    expect(r.sides.map((x) => [x.slot, x.title])).toEqual([['breakfast', 'Smoothie bowl med hallon'], ['lunch', 'Kycklingsallad']])
+  })
+})
+

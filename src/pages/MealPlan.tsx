@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AiProgress } from '../components/AiProgress'
 import { DoneButton } from '../components/DoneButton'
 import { Link } from 'react-router-dom'
-import { boxSides, fetchVariedMealPlan, missingForPlan, missingNeeds, planDays, planStart } from '../ai/mealPlan'
+import { boxSides, fetchLunches, fetchVariedMealPlan, missingForPlan, missingNeeds, planDays, planStart } from '../ai/mealPlan'
+import { isRealLunch } from '../domain/lunch'
 import { uncoveredNeeds } from '../domain/shoppingMerge'
 import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
@@ -27,6 +28,29 @@ type EatTarget = { table: 'mealPlan' | 'sides'; id: string; title: string; eaten
 
 /** Rätter som redan fått ett automatiskt receptförsök i den här sessionen. */
 const autoTried = new Set<string>()
+/**
+ * Luncher som inte var riktiga luncher och som redan fått ett försök att bytas ut (dag och
+ * rätt). Sparas i webbläsaren, så att ett byte som användaren ångrat inte görs om nästa gång.
+ */
+const LUNCH_TRIED = 'matplanerare-lunch-tried'
+const lunchTried = new Set<string>(
+  (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LUNCH_TRIED) ?? '[]') as unknown
+      return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : []
+    } catch {
+      return []
+    }
+  })(),
+)
+function rememberLunchTried(keys: string[]): void {
+  keys.forEach((k) => lunchTried.add(k))
+  try {
+    localStorage.setItem(LUNCH_TRIED, JSON.stringify([...lunchTried].slice(-60)))
+  } catch {
+    /* utan minne görs försöket om nästa gång, vilket bara kostar ett anrop */
+  }
+}
 
 export function MealPlanTab() {
   const plan = useMealPlan()
@@ -73,6 +97,30 @@ export function MealPlanTab() {
     })
   }, [plan, sides, pantry, settings, busy])
 
+  // Luncher i menyn som inte är riktiga luncher (en smoothie eller fruktsallad från en äldre
+  // version) byts en gång mot riktiga luncher, och får sedan ett recept. Bytet går att ångra.
+  useEffect(() => {
+    if (!plan || !sides || !pantry || !settings || !config || busy || !findRef.current) return
+    const from = toISODate(new Date())
+    const bad = sides.filter((x) => x.slot === 'lunch' && x.date >= from && !x.fromBatch && !x.eaten && !isRealLunch(x.title) && !lunchTried.has(`${x.id}|${x.title}`))
+    if (bad.length === 0) return
+    rememberLunchTried(bad.map((x) => `${x.id}|${x.title}`))
+    const find = findRef.current
+    void (async () => {
+      const headers = await authHeaders()
+      const avoid = [...plan.filter((d) => d.date >= from).map((d) => d.title), ...sides.filter((x) => x.date >= from).map((x) => x.title)]
+      const fixed = await fetchLunches(bad.map((x) => x.date), { allergies: settings.food.allergies, memories: settings.memories, avoid }, config.model, headers)
+      if (fixed.length === 0) return
+      const stamp = new Date().toISOString()
+      // Receptet hämtas här nedanför, inte en gång till av den automatiska sökningen.
+      fixed.forEach((f) => autoTried.add(`${f.date}:lunch`))
+      await undoable(fixed.length === 1 ? `Lunchen byttes mot ${fixed[0].title}` : `${fixed.length} luncher byttes mot riktiga luncher`, ['sides'], async () => {
+        for (const f of fixed) await db.sides.update(`${f.date}:lunch`, { title: f.title, minutes: f.minutes, ingredients: [], url: undefined, site: undefined, updatedAt: stamp })
+      })
+      for (const f of fixed) await find({ id: `${f.date}:lunch`, title: f.title, table: 'sides' }, headers)
+    })()
+  }, [plan, sides, pantry, settings, config, busy])
+
   if (!plan || !sides || !ratings || !pantry || !settings) return null
 
   const upcoming = plan.filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date))
@@ -93,7 +141,9 @@ export function MealPlanTab() {
     setFinding((s) => new Set(s).add(item.id))
     try {
       const s = await getSettings()
-      const r = await recipeForDish(item.title, { pantry: pantry!, food: s.food, memories: s.memories, today }, headers)
+      // Luncher får bara recept som är riktiga luncher (id:t slutar på måltiden: "2026-11-15:lunch").
+      const meal = item.table === 'sides' && item.id.endsWith(':lunch') ? 'lunch' : undefined
+      const r = await recipeForDish(item.title, { pantry: pantry!, food: s.food, memories: s.memories, today }, headers, fetch, meal)
       if (!r) {
         setNotFound((n) => new Set(n).add(item.id))
         return

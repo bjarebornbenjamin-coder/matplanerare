@@ -1,3 +1,4 @@
+import { isRealLunch } from '../domain/lunch'
 import { daysLeft, foodKey } from '../domain/food'
 import type { FoodSettings, ISODate, PantryItem } from '../domain/types'
 import { AiError, describeError } from './errors'
@@ -63,16 +64,20 @@ export async function findRecipes(q: RecipeQuery, headers: Record<string, string
 /**
  * Ett riktigt recept för rätten. Hittas ingen läsbar receptsida för just den rätten provas en
  * liknande rätt, och då byts namnet mot receptets. null om inget recept alls hittas: då ska
- * rätten inte visas som ett recept.
+ * rätten inte visas som ett recept. `meal` = 'lunch' godtar bara recept som är riktiga luncher,
+ * så att en sallad inte byts mot en fruktsallad.
  */
-export async function recipeForDish(dish: string, q: Omit<RecipeQuery, 'mode' | 'dish' | 'count' | 'wish'>, headers: Record<string, string>, fetchFn: typeof fetch = fetch): Promise<FoundRecipe | null> {
+export async function recipeForDish(dish: string, q: Omit<RecipeQuery, 'mode' | 'dish' | 'count' | 'wish'>, headers: Record<string, string>, fetchFn: typeof fetch = fetch, meal?: 'lunch'): Promise<FoundRecipe | null> {
+  const fits = (r: FoundRecipe | undefined) => (r && (meal !== 'lunch' || isRealLunch(r.title)) ? r : null)
   try {
-    return (await findRecipes({ ...q, mode: 'any', dish, count: 1 }, headers, fetchFn))[0]
+    const exact = fits((await findRecipes({ ...q, mode: 'any', dish, count: 1 }, headers, fetchFn))[0])
+    if (exact) return exact
   } catch {
     /* prova en liknande rätt */
   }
   try {
-    return (await findRecipes({ ...q, mode: 'any', wish: `${dish}, eller en liknande rätt`, count: 1 }, headers, fetchFn))[0]
+    const wish = meal === 'lunch' ? `${dish}, eller en liknande mättande lunchrätt (inte smoothie, fruktsallad eller efterrätt)` : `${dish}, eller en liknande rätt`
+    return fits((await findRecipes({ ...q, mode: 'any', wish, count: 1 }, headers, fetchFn))[0])
   } catch {
     return null
   }
