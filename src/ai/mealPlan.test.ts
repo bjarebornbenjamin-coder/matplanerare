@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOX_DAYS, INSPIRATION, LUNCH_PROMPT, MEAL_PLAN_PROMPT, parseLunches, boxSides, fetchVariedMealPlan, pickInspiration, repeats, sameDish, dayContext, fetchMealPlan, mealPlanUserContent, parseSides, planDays, missingForPlan, parseMealPlan, planStart } from './mealPlan'
+import { BOX_DAYS, INSPIRATION, LUNCH_PROMPT, MEAL_PLAN_PROMPT, parseLunches, swapDinner, swapSide, boxSides, fetchVariedMealPlan, pickInspiration, repeats, sameDish, dayContext, fetchMealPlan, mealPlanUserContent, parseSides, planDays, missingForPlan, parseMealPlan, planStart } from './mealPlan'
 import type { PantryItem, PlannedDinner } from '../domain/types'
 
 const food = { quickWeekdays: [2], trainingWeekdays: [3] }
@@ -265,6 +265,66 @@ describe('lunchen ska vara en riktig lunch', () => {
     const fetchFn = (async () => reply(JSON.stringify({ days: [{ date: '2026-11-14', title: 'Lasagne', lunch: { title: 'Kycklingsallad', minutes: 15 }, breakfast: { title: 'Smoothie bowl med hallon', minutes: 5 } }] }))) as typeof fetch
     const r = await fetchVariedMealPlan({ ...input, days: both }, 'm', {}, fetchFn)
     expect(r.sides.map((x) => [x.slot, x.title])).toEqual([['breakfast', 'Smoothie bowl med hallon'], ['lunch', 'Kycklingsallad']])
+  })
+})
+
+describe('byta en enskild rätt', () => {
+  const reply = (content: unknown) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), { status: 200 })
+  const input = { pantry, food: { allergies: 'Vegetariskt', portions: 2, weekWishes: 'fredag något lyxigt' }, memories: ['Gillar stark mat'], recent: ['Lasagne', 'Tacos'], replacing: ['Kycklinggryta med curry'], today: '2026-11-14', disliked: ['Fisksoppa'] }
+  const day = { ...dayContext('2026-11-15', food), portions: 6, batchBoxes: 4 }
+
+  it('middagen byts för just den dagen, med samma portioner och matlådor, utan frukost och lunch', async () => {
+    const sent: Record<string, unknown>[] = []
+    const fetchFn = (async (_u: string, init: RequestInit) => {
+      sent.push(JSON.parse(JSON.parse(String(init.body)).messages[1].content))
+      return reply({ days: [{ date: '2026-11-15', title: 'Linsgryta med kokosmjölk', reason: 'Storkok till matlådor', minutes: 40, lunch: { title: 'Ska inte användas' } }] })
+    }) as typeof fetch
+    const next = await swapDinner(day, input, 'm', {}, fetchFn, () => 0.5)
+    expect(next).toMatchObject({ id: '2026-11-15', date: '2026-11-15', title: 'Linsgryta med kokosmjölk', portions: 6, boxes: 4 })
+    expect(sent).toHaveLength(1)
+    expect(sent[0].days).toHaveLength(1)
+    expect((sent[0].days as Record<string, unknown>[])[0]).toMatchObject({ date: '2026-11-15', breakfast: false, lunch: false, portions: 6, batchBoxes: 4 })
+    expect(sent[0]).toMatchObject({ replacing: ['Kycklinggryta med curry'], allergies: 'Vegetariskt', wishes: 'fredag något lyxigt' })
+    expect(JSON.stringify(sent[0])).toMatch(/Lasagne/) // veckans övriga rätter ska undvikas
+  })
+
+  it('föreslår AI:n samma rätt igen frågas en gång till, och blir det ändå samma byts inget', async () => {
+    let calls = 0
+    const same = (async () => { calls++; return reply({ days: [{ date: '2026-11-15', title: 'Kycklinggryta med curry och ris' }] }) }) as typeof fetch
+    expect(await swapDinner(day, input, 'm', {}, same)).toBeNull()
+    expect(calls).toBe(2)
+    const second = (async () => reply({ days: [{ date: '2026-11-15', title: ++calls === 3 ? 'Kycklinggryta med curry' : 'Halloumiburgare' }] })) as typeof fetch
+    expect((await swapDinner(day, input, 'm', {}, second))?.title).toBe('Halloumiburgare')
+  })
+
+  it('lunchen byts mot en riktig lunch som inte redan finns i veckan', async () => {
+    const sent: { system: string; user: Record<string, unknown> }[] = []
+    const fetchFn = (async (_u: string, init: RequestInit) => {
+      const m = JSON.parse(String(init.body)).messages
+      sent.push({ system: m[0].content, user: JSON.parse(m[1].content) })
+      return reply({ lunches: [{ date: '2026-11-15', title: 'Halloumisallad', minutes: 15 }] })
+    }) as typeof fetch
+    expect(await swapSide('lunch', day, { ...input, replacing: ['Pastasallad'] }, 'm', {}, fetchFn)).toEqual({ title: 'Halloumisallad', minutes: 15 })
+    expect(sent[0].system).toBe(LUNCH_PROMPT)
+    expect(sent[0].user).toMatchObject({ dates: ['2026-11-15'], allergies: 'Vegetariskt' })
+    expect(sent[0].user.avoid).toEqual(expect.arrayContaining(['Pastasallad', 'Lasagne', 'Fisksoppa']))
+    // En smoothie eller samma lunch igen godtas inte.
+    const smoothie = (async () => reply({ lunches: [{ date: '2026-11-15', title: 'Grön smoothie' }] })) as typeof fetch
+    expect(await swapSide('lunch', day, { ...input, replacing: ['Pastasallad'] }, 'm', {}, smoothie)).toBeNull()
+    const again = (async () => reply({ lunches: [{ date: '2026-11-15', title: 'Pastasallad med pesto' }] })) as typeof fetch
+    expect(await swapSide('lunch', day, { ...input, replacing: ['Pastasallad'] }, 'm', {}, again)).toBeNull()
+  })
+
+  it('frukosten byts mot en ny frukost', async () => {
+    let asked: Record<string, unknown> = {}
+    const fetchFn = (async (_u: string, init: RequestInit) => {
+      asked = JSON.parse(JSON.parse(String(init.body)).messages[1].content)
+      return reply({ days: [{ date: '2026-11-15', title: 'Lasagne', breakfast: { title: 'Äggmuffins med spenat', minutes: 20 } }] })
+    }) as typeof fetch
+    expect(await swapSide('breakfast', day, { ...input, replacing: ['Overnight oats med blåbär'] }, 'm', {}, fetchFn)).toEqual({ title: 'Äggmuffins med spenat', minutes: 20 })
+    expect((asked.days as Record<string, unknown>[])[0]).toMatchObject({ breakfast: true, lunch: false })
+    const none = (async () => reply({ days: [{ date: '2026-11-15', title: 'Lasagne' }] })) as typeof fetch
+    expect(await swapSide('breakfast', day, input, 'm', {}, none)).toBeNull()
   })
 })
 

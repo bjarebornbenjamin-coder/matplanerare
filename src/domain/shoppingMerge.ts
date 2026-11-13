@@ -162,3 +162,26 @@ export function uncoveredNeeds(needs: { name: string; amount?: string; dish: str
   const open = needs.filter((n) => !list.some((row) => covers(row.note, n.dish) && sameShoppingItem(row.name, n.name, aliases)))
   return mergeShopping(open.map((n) => ({ name: n.name, ...(n.amount ? { amount: n.amount } : {}), note: n.dish })), aliases).lines
 }
+
+/**
+ * Vad som händer med inköpslistan när en rätt tas ur menyn: rader som bara var till den rätten
+ * tas bort, och på rader som räcker till flera rätter stryks rättens namn (mängden står kvar,
+ * eftersom det inte går att veta hur stor del som var till just den rätten).
+ */
+export function withoutDish<T extends { note?: string }>(rows: T[], dish: string): { remove: T[]; update: { row: T; note: string }[] } {
+  const title = dish.trim().toLowerCase()
+  const remove: T[] = []
+  const update: { row: T; note: string }[] = []
+  if (!title) return { remove, update }
+  for (const row of rows) {
+    const note = (row.note ?? '').replace(/^veckomeny:\s*/i, '')
+    const at = note.toLowerCase().indexOf(title)
+    if (at < 0) continue
+    // Stryk namnet och det kommatecken som blev över.
+    const rest = `${note.slice(0, at)}${note.slice(at + title.length)}`.replace(/^\s*,\s*|\s*,\s*$/g, '').replace(/,\s*,/g, ',').trim()
+    if (rest) update.push({ row, note: rest })
+    else remove.push(row)
+  }
+  return { remove, update }
+}
+

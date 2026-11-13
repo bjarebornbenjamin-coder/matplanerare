@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sameShoppingItem } from './consume'
-import { addAmounts, mergeRows, mergeShopping, uncoveredNeeds } from './shoppingMerge'
+import { addAmounts, mergeRows, mergeShopping, uncoveredNeeds, withoutDish } from './shoppingMerge'
 
 describe('ihopslagning av inköpslistan', () => {
   it('lök på tre ställen blir en rad', () => {
@@ -142,5 +142,21 @@ describe('ihopslagning av inköpslistan', () => {
   it('gurka i centimeter slås ihop med gurka i styck', () => {
     const r = mergeShopping([{ name: 'cm gurka', amount: '12', note: 'Sallad' }, { name: 'Gurka', amount: '1 st', note: 'Tzatziki' }])
     expect(r.lines).toEqual([{ name: 'Gurka', amount: '2 st', note: 'Sallad, Tzatziki' }])
+  })
+  it('när en rätt byts ut tas varorna som bara var till den bort från listan', () => {
+    const rows = [
+      { id: 'a', name: 'Kokosmjölk', note: 'Thaicurry med kyckling' },
+      { id: 'b', name: 'Gul lök', note: 'Pyttipanna, Thaicurry med kyckling, Laxsoppa' },
+      { id: 'c', name: 'Lime', note: 'Veckomeny: Thaicurry med kyckling' },
+      { id: 'd', name: 'Potatis', note: 'Pyttipanna' },
+      { id: 'e', name: 'Mjölk' },
+      { id: 'f', name: 'Ris', note: 'thaicurry med kyckling, Risotto med ost, prinskorv, gurka och tomat' },
+    ]
+    const r = withoutDish(rows, 'Thaicurry med kyckling')
+    expect(r.remove.map((x) => x.id)).toEqual(['a', 'c'])
+    expect(r.update.map((u) => [u.row.id, u.note])).toEqual([['b', 'Pyttipanna, Laxsoppa'], ['f', 'Risotto med ost, prinskorv, gurka och tomat']])
+    // Egna varor och andra rätters varor rörs inte, och ett tomt namn gör ingenting.
+    expect(withoutDish(rows, 'Fiskgratäng')).toEqual({ remove: [], update: [] })
+    expect(withoutDish(rows, '  ')).toEqual({ remove: [], update: [] })
   })
 })

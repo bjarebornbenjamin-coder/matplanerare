@@ -37,7 +37,7 @@ export const TOUR_STEPS: Step[] = [
     route: '/',
     targets: [['.dinner']],
     title: 'Dina rätter',
-    text: 'När menyn är klar visas rätterna under Veckans mat. Öppna receptet, tryck ”Jag åt detta” så dras varorna från lagret, och ge tummen upp eller ner så lär sig appen din smak.',
+    text: 'När menyn är klar visas rätterna under Veckans mat. Öppna receptet, byt en rätt du inte är sugen på, tryck ”Jag åt detta” så dras varorna från lagret, och ge tummen upp eller ner.',
   },
   {
     route: '/',

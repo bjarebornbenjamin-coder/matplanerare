@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AiProgress } from '../components/AiProgress'
 import { DoneButton } from '../components/DoneButton'
 import { Link } from 'react-router-dom'
-import { boxSides, fetchLunches, fetchVariedMealPlan, missingForPlan, missingNeeds, planDays, planStart } from '../ai/mealPlan'
+import { boxSides, dayContext, fetchLunches, fetchVariedMealPlan, missingForPlan, missingNeeds, planDays, planStart, swapDinner, swapSide } from '../ai/mealPlan'
 import { isRealLunch } from '../domain/lunch'
-import { uncoveredNeeds } from '../domain/shoppingMerge'
+import { uncoveredNeeds, withoutDish } from '../domain/shoppingMerge'
 import { withPantryStatus } from '../ai/recipes'
 import { IngredientList } from '../components/IngredientList'
 import { db } from '../db/db'
@@ -20,7 +20,7 @@ import { recipeForDish, splitIngredient } from '../ai/recipeSearch'
 import type { DishRating, PantryItem, PlannedDinner, PlannedSide } from '../domain/types'
 import { useAiConfig, useMealPlan, useNow, usePantry, useRatings, useSettings, useSides } from '../hooks'
 import { authHeaders } from '../lib/auth'
-import { undoable } from '../lib/undo'
+import { showToast, undoable } from '../lib/undo'
 
 type RecipeTarget = { id: string; title: string; table: 'mealPlan' | 'sides' }
 /** En rätt som användaren ätit: middag, frukost, lunch eller matlåda. */
@@ -63,6 +63,8 @@ export function MealPlanTab() {
   const today = toISODate(now)
   const [days, setDays] = useState(7)
   const [busy, setBusy] = useState(false)
+  /** Rätter som håller på att bytas mot ett nytt förslag. */
+  const [swapping, setSwapping] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
   const [finding, setFinding] = useState<Set<string>>(new Set())
   const [notFound, setNotFound] = useState<Set<string>>(new Set())
@@ -175,6 +177,93 @@ export function MealPlanTab() {
     const used = consumption(target.ingredients, pantry!)
     if (used.length === 0) return undoable(`${target.title} är markerad som uppäten`, [target.table], () => markEaten(target, []))
     setEating({ target, used })
+  }
+
+  /** Underlaget för ett nytt förslag på en enda rätt: samma som när hela menyn görs. */
+  async function swapInput(old: string | undefined, others: string[]) {
+    const stored = await getSettings()
+    // Önskemål som skrivits men inte sparats än (rutan sparar när den lämnas).
+    const food = { ...stored.food, weekWishes: (wishes ?? stored.food.weekWishes ?? '').trim() }
+    return {
+      food,
+      input: {
+        pantry: pantry!.filter((p) => !p.expires || p.expires >= today), food, memories: stored.memories,
+        recent: others, replacing: old ? [old] : [], today,
+        liked: ratings!.filter((r) => r.rating === 1).map((r) => r.title).slice(0, 30),
+        disliked: ratings!.filter((r) => r.rating === -1).map((r) => r.title).slice(0, 50),
+      },
+    }
+  }
+
+  /** Varor på inköpslistan som bara var till den gamla rätten tas bort; övriga rader behåller sin mängd. */
+  async function openShoppingFor(dish: string) {
+    return withoutDish((await db.shopping.toArray()).filter((i) => !i.done), dish)
+  }
+  async function dropFromShopping(stale: Awaited<ReturnType<typeof openShoppingFor>>, stamp: string) {
+    await db.shopping.bulkDelete(stale.remove.map((r) => r.id))
+    for (const u of stale.update) await db.shopping.update(u.row.id, { note: u.note, updatedAt: stamp })
+  }
+  const dropped = (n: number) => (n ? `. ${n} ${n === 1 ? 'vara' : 'varor'} till den gamla rätten togs bort från inköpslistan` : '')
+  const setSwap = (id: string, on: boolean) => setSwapping((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n })
+
+  /**
+   * Byter middagen en dag mot ett nytt förslag (eller föreslår en rätt för en dag som saknar
+   * middag) och hämtar ett recept till den. Resten av menyn rörs inte. Går att ångra.
+   */
+  async function swapDinnerAt(date: string) {
+    const old = plan!.find((d) => d.date === date)
+    setSwap(date, true)
+    try {
+      // Veckans övriga rätter och de senaste veckornas: förslaget ska vara något annat.
+      const others = plan!.filter((d) => d.date !== date && d.date >= addDays(today, -21)).map((d) => d.title)
+      const { food, input } = await swapInput(old?.title, others)
+      // Ett storkok förblir ett storkok: samma portioner och matlådor som förut.
+      const day = { ...dayContext(date, food), portions: old?.portions ?? food.portions, ...(old?.boxes ? { batchBoxes: old.boxes } : {}) }
+      const headers = await authHeaders()
+      const next = await swapDinner(day, input, config?.model ?? 'gpt-4o-mini', headers)
+      if (!next) return showToast('AI:n föreslog samma rätt igen. Försök en gång till.')
+      const stale = old ? await openShoppingFor(old.title) : { remove: [], update: [] }
+      const stamp = new Date().toISOString()
+      autoTried.add(next.id) // receptet hämtas här nedanför
+      await undoable(`${old ? `${old.title} byttes mot ${next.title}` : `${next.title} lades till`}${dropped(stale.remove.length)}`, ['mealPlan', 'sides', 'shopping'], async () => {
+        await db.mealPlan.put({ ...next, updatedAt: stamp })
+        // Matlådorna följer med storkoket.
+        for (const box of sides!.filter((x) => x.fromBatch === date)) await db.sides.update(box.id, { title: next.title, updatedAt: stamp })
+        await dropFromShopping(stale, stamp)
+      })
+      await findRecipe({ id: next.id, title: next.title, table: 'mealPlan' }, headers)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Kunde inte byta rätten. Försök igen.')
+    } finally {
+      setSwap(date, false)
+    }
+  }
+
+  /** Byter en frukost eller lunch mot ett nytt förslag och hämtar ett recept till den. */
+  async function swapSideAt(side: PlannedSide) {
+    setSwap(side.id, true)
+    try {
+      const others = [
+        ...sides!.filter((x) => x.slot === side.slot && x.id !== side.id && x.date >= addDays(today, -21)).map((x) => x.title),
+        ...plan!.filter((d) => d.date >= today).map((d) => d.title),
+      ]
+      const { food, input } = await swapInput(side.title, others)
+      const headers = await authHeaders()
+      const next = await swapSide(side.slot, dayContext(side.date, food), input, config?.model ?? 'gpt-4o-mini', headers)
+      if (!next) return showToast(`Det kom inget nytt förslag på ${side.slot === 'lunch' ? 'lunch' : 'frukost'} den här gången. Försök igen.`)
+      const stale = await openShoppingFor(side.title)
+      const stamp = new Date().toISOString()
+      autoTried.add(side.id)
+      await undoable(`${side.title} byttes mot ${next.title}${dropped(stale.remove.length)}`, ['sides', 'shopping'], async () => {
+        await db.sides.update(side.id, { title: next.title, minutes: next.minutes, ingredients: [], url: undefined, site: undefined, updatedAt: stamp })
+        await dropFromShopping(stale, stamp)
+      })
+      await findRecipe({ id: side.id, title: next.title, table: 'sides' }, headers)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Kunde inte byta rätten. Försök igen.')
+    } finally {
+      setSwap(side.id, false)
+    }
   }
 
   async function generate() {
@@ -408,7 +497,7 @@ export function MealPlanTab() {
         const sideRows = daySides.length > 0 && (
           <div className="sides">
             {daySides.map((x) => (
-              <SideRow key={x.id} side={x} dinners={upcoming.concat(plan.filter((p) => p.date < today))} pantry={pantry} expiring={expiring} finding={finding.has(x.id)} notFound={notFound.has(x.id)} onAte={() => ate({ table: 'sides', id: x.id, title: x.fromBatch ? `Matlåda: ${x.title}` : x.title, eaten: x.eaten, ingredients: x.ingredients })} onFind={async () => findRecipe({ id: x.id, title: x.title, table: 'sides' }, await authHeaders())} />
+              <SideRow key={x.id} side={x} dinners={upcoming.concat(plan.filter((p) => p.date < today))} pantry={pantry} expiring={expiring} finding={finding.has(x.id)} notFound={notFound.has(x.id)} swapping={swapping.has(x.id)} onSwap={() => swapSideAt(x)} onAte={() => ate({ table: 'sides', id: x.id, title: x.fromBatch ? `Matlåda: ${x.title}` : x.title, eaten: x.eaten, ingredients: x.ingredients })} onFind={async () => findRecipe({ id: x.id, title: x.title, table: 'sides' }, await authHeaders())} />
             ))}
           </div>
         )
@@ -418,6 +507,12 @@ export function MealPlanTab() {
               <div className="dinner-head">
                 <DateBadge date={date} today={today} />
                 <div className="dinner-headline"><h3 className="dinner-title muted-title">Ingen middag planerad</h3></div>
+              </div>
+              <div className="dinner-main">
+                <AiProgress active={swapping.has(date)} expected={10} label="Letar efter en rätt" />
+                <div className="dinner-actions">
+                  <button type="button" className="btn" disabled={busy || swapping.has(date)} onClick={() => swapDinnerAt(date)}>{swapping.has(date) ? 'Letar…' : 'Föreslå en rätt'}</button>
+                </div>
               </div>
               {sideRows}
             </section>
@@ -453,6 +548,7 @@ export function MealPlanTab() {
               {!d.url && !finding.has(d.id) && (
                 <p className="dinner-note">{notFound.has(d.id) ? 'Hittade inget recept på nätet för den här rätten. Försök igen, eller ta bort den och gör om menyn.' : 'Receptet är inte hämtat än.'}</p>
               )}
+              <AiProgress active={swapping.has(d.id)} expected={10} label="Letar efter en ny rätt" />
               <AiProgress active={finding.has(d.id)} expected={20} label="Letar recept på nätet" />
               <div className="dinner-actions">
                 {d.url ? (
@@ -464,6 +560,7 @@ export function MealPlanTab() {
                   Ingredienser <span className="num">{d.ingredients.length}</span> <svg className={`caret${open ? ' up' : ''}`} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
                 </button>}
                 <button type="button" className={`btn${d.eaten ? ' is-done' : ''}`} aria-pressed={Boolean(d.eaten)} onClick={() => ate({ table: 'mealPlan', id: d.id, title: d.title, eaten: d.eaten, ingredients: d.ingredients })}>{d.eaten ? '✓ Uppäten' : 'Jag åt detta'}</button>
+                {!d.eaten && <button type="button" className="btn" disabled={busy || swapping.has(d.id) || finding.has(d.id)} onClick={() => swapDinnerAt(d.date)}>{swapping.has(d.id) ? 'Byter…' : 'Byt rätt'}</button>}
               </div>
               {open && d.url && (
                 <div className="dinner-ingredients">
@@ -550,7 +647,7 @@ function DateBadge({ date, today }: { date: string; today: string }) {
 const SLOT_LABEL = { breakfast: 'Frukost', lunch: 'Lunch' } as const
 
 /** Frukost eller lunch under dagens middag. En matlåda visar storkokets rätt. */
-function SideRow({ side, dinners, pantry, expiring, finding, notFound, onFind, onAte }: { side: PlannedSide; dinners: PlannedDinner[]; pantry: PantryItem[]; expiring: Set<string>; finding: boolean; notFound: boolean; onFind: () => void; onAte: () => void }) {
+function SideRow({ side, dinners, pantry, expiring, finding, notFound, swapping, onFind, onAte, onSwap }: { side: PlannedSide; dinners: PlannedDinner[]; pantry: PantryItem[]; expiring: Set<string>; finding: boolean; notFound: boolean; swapping: boolean; onFind: () => void; onAte: () => void; onSwap: () => void }) {
   const [open, setOpen] = useState(false)
   const from = side.fromBatch ? dinners.find((d) => d.date === side.fromBatch) : undefined
   const title = side.fromBatch ? `Matlåda: ${from?.title ?? side.title}` : side.title
@@ -560,7 +657,9 @@ function SideRow({ side, dinners, pantry, expiring, finding, notFound, onFind, o
   const needsRecipe = !side.fromBatch && !side.url
   const meta = side.fromBatch
     ? `Från storkoket ${WEEKDAYS_LONG[weekdayOf(side.fromBatch) - 1]}`
-    : needsRecipe
+    : swapping
+      ? 'Letar efter en ny rätt…'
+      : needsRecipe
       ? finding ? 'Letar recept på nätet…' : notFound ? 'Hittade inget recept på nätet.' : 'Receptet är inte hämtat än.'
       : [side.minutes !== null ? `${side.minutes} min` : null, side.site ?? null, side.ingredients.length ? (lacking ? `${lacking} saknas` : 'allt hemma') : null].filter(Boolean).join(' · ')
   return (
@@ -569,9 +668,13 @@ function SideRow({ side, dinners, pantry, expiring, finding, notFound, onFind, o
       <div className="side-body">
         <div className="side-title">{title}</div>
         {meta && <div className={`side-meta${lacking && !side.fromBatch && !needsRecipe ? ' warn' : ''}`}>{meta}</div>}
-        {side.url && <a className="side-link" href={httpsUrl(side.url)} target="_blank" rel="noreferrer">Öppna receptet</a>}
-        {needsRecipe && !finding && <button type="button" className="side-link" onClick={onFind}>{notFound ? 'Försök igen' : 'Hitta recept'}</button>}
-        <button type="button" className={`side-link${side.eaten ? ' is-done' : ''}`} aria-pressed={Boolean(side.eaten)} onClick={onAte}>{side.eaten ? '✓ Uppäten' : 'Jag åt detta'}</button>
+        <div className="side-links">
+          {side.url && <a className="side-link" href={httpsUrl(side.url)} target="_blank" rel="noreferrer">Öppna receptet</a>}
+          {needsRecipe && !finding && !swapping && <button type="button" className="side-link" onClick={onFind}>{notFound ? 'Försök igen' : 'Hitta recept'}</button>}
+          <button type="button" className={`side-link${side.eaten ? ' is-done' : ''}`} aria-pressed={Boolean(side.eaten)} onClick={onAte}>{side.eaten ? '✓ Uppäten' : 'Jag åt detta'}</button>
+          {/* En matlåda följer storkoket: den byts genom att byta middagen den kommer från. */}
+          {!side.fromBatch && !side.eaten && <button type="button" className="side-link" disabled={swapping || finding} onClick={onSwap}>{swapping ? 'Byter…' : 'Byt'}</button>}
+        </div>
         {open && (
           <div className="dinner-ingredients">
             <IngredientList items={ingredients} expiring={expiring} />
