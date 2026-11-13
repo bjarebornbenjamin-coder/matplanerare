@@ -298,7 +298,7 @@ export function MealPlanTab() {
   return (
     <>
       <h2>Planera</h2>
-      <label className="field wish-field">
+      <label className="field wish-field" data-tour="wishes">
         <span>Önskemål för veckan</span>
         <textarea
           rows={3}
@@ -312,7 +312,7 @@ export function MealPlanTab() {
           }}
         />
       </label>
-      <div className="actions" style={{ marginTop: 8 }}>
+      <div className="actions" style={{ marginTop: 8 }} data-tour="generate">
         <label className="inline-field">
           <span>Dagar</span>
           <select value={days} onChange={(e) => setDays(Number(e.target.value))}>

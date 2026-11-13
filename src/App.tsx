@@ -2,11 +2,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ToastBar } from './components/ToastBar'
+import { Tour } from './components/Tour'
 import { db } from './db/db'
 import { savePendingAnswers } from './db/repo'
 import { useSettings } from './hooks'
 import { useApplyBackground } from './lib/background'
 import { useOnboarding } from './lib/onboarding'
+import { startTour, useTour } from './lib/tour'
 import { useNotificationSync } from './push/useNotificationSync'
 import { useSyncRunner } from './sync/useSyncRunner'
 import { syncConfigured, useSession } from './sync/supabase'
@@ -63,6 +65,12 @@ export function App() {
   const loggedOut = syncConfigured && !session
   // Frågorna om portioner, matpreferenser och allergier kommer före inloggningen.
   const asking = !loading && !onboarding.done && (loggedOut || (!syncConfigured && !hasSettings))
+  // Första gången man kommer in i appen visas en rundtur som lyser upp det viktigaste.
+  const tour = useTour()
+  const inApp = !loading && !asking && !loggedOut
+  useEffect(() => {
+    if (inApp && !tour.done && !tour.active) startTour()
+  }, [inApp, tour.done, tour.active])
 
   useEffect(() => {
     const root = document.documentElement
@@ -95,6 +103,7 @@ export function App() {
         )}
       </main>
       <ToastBar />
+      {inApp && tour.active && <Tour />}
       {(!syncConfigured || session) && !asking && <Nav />}
     </BrowserRouter>
   )

@@ -9,6 +9,7 @@ import { diagnose, type Diagnosis } from '../ai/diagnose'
 import { setBackgroundImage, setBackgroundVeil, useBackground } from '../lib/background'
 import { imageToDataUrl } from '../lib/image'
 import { authHeaders } from '../lib/auth'
+import { startTour } from '../lib/tour'
 import { parseBackup } from '../db/backup'
 import { exportAll, importAll, saveAiConfig, saveSettings } from '../db/repo'
 import { db } from '../db/db'
@@ -399,6 +400,18 @@ export function SettingsPage() {
           </div>
         </section>
       ))}
+      <section aria-label="Hjälp">
+        <h2>Hjälp</h2>
+        <div className="settings-list">
+          <button type="button" className="settings-row" onClick={startTour}>
+            <span>
+              <span className="title">Visa guiden igen</span>
+              <span className="sub">En kort rundtur genom appens viktigaste delar</span>
+            </span>
+            <span className="chev" aria-hidden="true">›</span>
+          </button>
+        </div>
+      </section>
     </>
   )
 }

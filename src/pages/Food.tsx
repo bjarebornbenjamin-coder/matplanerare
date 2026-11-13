@@ -47,7 +47,7 @@ export function PantryTab() {
         {pantry.length === 0 ? 'Lagret är tomt.' : `${pantry.length} varor`}
         {soon > 0 ? ` · ${soon} går ut snart eller har gått ut` : ''}
       </p>
-      <div className="actions" style={{ marginTop: 0, marginBottom: 12 }}>
+      <div className="actions" style={{ marginTop: 0, marginBottom: 12 }} data-tour="pantry-actions">
         <button type="button" className="btn primary" onClick={() => setEditing('new')}>Lägg till vara</button>
         <Link to="/skanna?typ=kvitto" className="btn">Skanna kvitto</Link>
         <Link to="/skanna?typ=kylskap" className="btn">Skanna kylskåp</Link>
