@@ -1,8 +1,6 @@
 {
   "rewrites": [
     { "source": "/api/chat", "destination": "/api/ai" },
-    { "source": "/om", "destination": "/om/index.html" },
-    { "source": "/om/", "destination": "/om/index.html" },
     { "source": "/((?!api/|assets/|.*\\..*).*)", "destination": "/index.html" }
   ],
   "headers": [

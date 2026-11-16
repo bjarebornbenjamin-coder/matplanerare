@@ -410,13 +410,6 @@ export function SettingsPage() {
             </span>
             <span className="chev" aria-hidden="true">›</span>
           </button>
-          <a className="settings-row" href="/om/">
-            <span>
-              <span className="title">Om Matplaneraren</span>
-              <span className="sub">Presentationssidan som nya besökare ser, att dela med andra</span>
-            </span>
-            <span className="chev" aria-hidden="true">›</span>
-          </a>
         </div>
       </section>
     </>

@@ -52,15 +52,6 @@ export const ALLERGENS: Choice[] = [
 export const MIN_PORTIONS = 1
 export const MAX_PORTIONS = 8
 
-/** En kort beskrivning av antalet portioner, som visas under siffran. */
-export function portionCaption(n: number): string {
-  if (n === 1) return 'Bara till mig'
-  if (n === 2) return 'Till två'
-  if (n <= 4) return 'Till en liten familj'
-  if (n <= 6) return 'Till en stor familj'
-  return 'Till ett helt gäng'
-}
-
 export interface Answers {
   /** Portioner per måltid. Saknas om användaren inte ändrade förslaget. */
   portions?: number

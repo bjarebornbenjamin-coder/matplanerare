@@ -1,11 +1,19 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
-import { ALLERGENS, DIETS, LIKES, MAX_PORTIONS, MIN_PORTIONS, emptyAnswers, portionCaption, toggleDiet, type Answers } from '../domain/onboarding'
+import { ALLERGENS, DIETS, LIKES, MAX_PORTIONS, MIN_PORTIONS, emptyAnswers, toggleDiet, type Answers } from '../domain/onboarding'
 import { finishOnboarding, useOnboarding } from '../lib/onboarding'
 
 /** Antal frågor (välkomstvyn räknas inte). */
 const QUESTIONS = 3
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
+
+function portionCaption(n: number): string {
+  if (n === 1) return 'Bara till mig'
+  if (n === 2) return 'Till två'
+  if (n <= 4) return 'Till en liten familj'
+  if (n <= 6) return 'Till en stor familj'
+  return 'Till ett helt gäng'
+}
 
 /** Ett val man slår av och på. */
 function Pick({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
@@ -39,12 +47,11 @@ function Hero() {
  * Frågorna som ställs innan inloggningen: portioner, matpreferenser och allergier. Varje fråga
  * har ett svar som går att gå vidare med direkt, så ingen fråga måste fyllas i.
  */
-/** `startAt` = 1 när besökaren kommer från presentationssidan, som redan har visat välkomsten. */
-export function Onboarding({ defaultPortions, hasAccounts, startAt, onDone }: { defaultPortions: number; hasAccounts: boolean; startAt?: number; onDone?: () => void }) {
+export function Onboarding({ defaultPortions, hasAccounts, onDone }: { defaultPortions: number; hasAccounts: boolean; onDone?: () => void }) {
   const saved = useOnboarding().answers
   const [a, setA] = useState<Answers>(() => saved ?? emptyAnswers())
   // Den som kommer tillbaka för att ändra sina svar hamnar direkt på första frågan.
-  const [step, setStep] = useState(startAt ?? (saved ? 1 : 0))
+  const [step, setStep] = useState(saved ? 1 : 0)
   const [dir, setDir] = useState<'next' | 'prev'>('next')
   const [bump, setBump] = useState<'up' | 'down'>('up')
   const portions = a.portions ?? defaultPortions
