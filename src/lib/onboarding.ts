@@ -67,3 +67,37 @@ export function reopenOnboarding(): void {
 export function clearPendingAnswers(): void {
   if (state.answers) set({ ...state, answers: null })
 }
+
+// ------------------------------------------------------------ presentationssidan
+
+/**
+ * Presentationssidan (/om/) leder hit med ?start=fragor (Kom igång) eller ?start=logga-in.
+ * Läses en gång när appen startar och tas sedan bort ur adressen.
+ */
+export type StartFrom = 'fragor' | 'logga-in' | null
+
+export function readStartParam(): StartFrom {
+  try {
+    const url = new URL(window.location.href)
+    const start = url.searchParams.get('start')
+    if (!start) return null
+    url.searchParams.delete('start')
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+    return start === 'fragor' || start === 'logga-in' ? start : null
+  } catch {
+    return null
+  }
+}
+
+const LANDING_SEEN = 'matplanerare-landing-seen'
+
+/** Har den här enheten redan varit på presentationssidan och gått vidare därifrån? */
+export function landingSeen(): boolean {
+  try {
+    return localStorage.getItem(LANDING_SEEN) === '1'
+  } catch {
+    // Utan lagring går det inte att komma ihåg: skicka då ingen dit, så att ingen fastnar i en loop.
+    return true
+  }
+}
+

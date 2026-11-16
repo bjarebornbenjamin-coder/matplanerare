@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -25,6 +26,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        // Presentationssidan är en egen sida, inte appen: den ska aldrig ersättas av appens index.html.
+        navigateFallbackDenylist: [/^\/om(?:\/|$)/],
         importScripts: ['push-sw.js'],
         // Typsnittet sparas så att appen ser likadan ut offline.
         runtimeCaching: [
@@ -34,5 +37,14 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      // Appen, och presentationssidan på /om/.
+      input: {
+        main: fileURLToPath(new URL('index.html', import.meta.url)),
+        om: fileURLToPath(new URL('om/index.html', import.meta.url)),
+      },
+    },
+  },
   test: { environment: 'node', setupFiles: ['fake-indexeddb/auto'] },
 })

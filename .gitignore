@@ -4,3 +4,5 @@ dist
 *.local
 preview-shots
 .apitest
+# scroll-craft: skärmbilder från kontrollerna
+scrollcraft/lab/
